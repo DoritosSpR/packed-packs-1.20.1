@@ -4,7 +4,6 @@ import io.github.fishstiz.packed_packs.config.Config;
 import io.github.fishstiz.packed_packs.config.DevConfig;
 import io.github.fishstiz.packed_packs.config.PackOptions;
 import io.github.fishstiz.packed_packs.config.Profile;
-import net.minecraft.server.packs.PackSelectionConfig;
 import net.minecraft.server.packs.repository.Pack;
 import org.jetbrains.annotations.Nullable;
 
@@ -45,10 +44,7 @@ public class PackOptionsContext implements PackOptions {
         return this.resolver.getPositionOrDefault(pack);
     }
 
-    @Override
-    public PackSelectionConfig getSelectionConfig(Pack pack) {
-        return this.resolver.getSelectionConfigOrDefault(pack);
-    }
+    // Se elimina el @Override de getSelectionConfig
 
     public Optional<Profile> getProfile() {
         return Optional.ofNullable(this.resolver.profileSupplier().get());
@@ -64,7 +60,6 @@ public class PackOptionsContext implements PackOptions {
 
         Profile defaultProfile = this.resolver.config().getDefaultProfile();
 
-        // non-default profiles cannot override required to false
         if (defaultProfile == null || !defaultProfile.overridesRequired(pack)) {
             if (profile.overridesRequired(pack) && !profile.isRequired(pack)) {
                 profile.setRequired(null, pack);
@@ -95,7 +90,7 @@ public class PackOptionsContext implements PackOptions {
         Profile profile = this.resolver.profileSupplier().get();
 
         return (defaultProfile != null && defaultProfile.hasOverride(pack)) ||
-               (profile != null && profile.hasOverride(pack));
+                (profile != null && profile.hasOverride(pack));
     }
 
     public ProfileScope hasOverride(Pack pack, BiPredicate<Profile, Pack> option) {
