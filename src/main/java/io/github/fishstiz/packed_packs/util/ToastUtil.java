@@ -6,11 +6,12 @@ import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 
 public class ToastUtil {
-    private static final SystemToast.SystemToastId FILE_OPS_FAIL_ID = new SystemToast.SystemToastId();
-    private static final SystemToast.SystemToastId DEV_MODE_ID = new SystemToast.SystemToastId(750);
+    // En 1.20.1, SystemToastId es una clase interna. 
+    // Si el constructor es privado o requiere parámetros, usamos los predefinidos o ajustamos:
+    private static final SystemToast.SystemToastId FILE_OPS_FAIL_ID = SystemToast.SystemToastId.PACK_COPY_FAILURE;
+    private static final SystemToast.SystemToastId DEV_MODE_ID = SystemToast.SystemToastId.PERIODIC_NOTIFICATION;
 
-    private ToastUtil() {
-    }
+    private ToastUtil() {}
 
     public static void onDevModeToggleToast(boolean enabled) {
         Component enableText = enabled ? CommonComponents.OPTION_ON : CommonComponents.OPTION_OFF;
