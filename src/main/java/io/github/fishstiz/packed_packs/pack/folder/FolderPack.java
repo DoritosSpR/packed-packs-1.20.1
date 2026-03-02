@@ -28,17 +28,23 @@ import java.util.function.Function;
 public class FolderPack extends Pack implements FilePack {
     public static final Component FOLDER_OPEN_TEXT = ResourceUtil.getText("folder.open");
     public static final Component FOLDER_DESCRIPTION = ResourceUtil.getText("folder");
-    public static final PackSelectionConfig FOLDER_SELECTION_CONFIG = new PackSelectionConfig(false, Position.TOP, false);
-    public static final Metadata FOLDER_METADATA = new Metadata(FOLDER_DESCRIPTION, PackCompatibility.COMPATIBLE, FeatureFlagSet.of(), Collections.emptyList());
+    
     private final Function<FolderPack, List<Pack>> nestedPacksProvider;
     private final Path path;
 
     public FolderPack(String id, String name, Function<FolderPack, List<Pack>> nestedPacksProvider, Path path) {
+        // CONSTRUCTOR MODIFICADO PARA 1.20.1
         super(
-                new PackLocationInfo(id, Component.literal(name), PackUtil.PACK_SOURCE, Optional.empty()),
-                new FolderResourcesSupplier(path),
-                FOLDER_METADATA,
-                FOLDER_SELECTION_CONFIG
+            id, 
+            true, // isRequired
+            new FolderResourcesSupplier(path), 
+            Component.literal(name), 
+            FOLDER_DESCRIPTION, 
+            PackCompatibility.COMPATIBLE, 
+            FeatureFlagSet.of(), 
+            Pack.Position.TOP, 
+            false, // fixedPosition
+            PackUtil.PACK_SOURCE
         );
         this.nestedPacksProvider = nestedPacksProvider;
         this.path = path;
