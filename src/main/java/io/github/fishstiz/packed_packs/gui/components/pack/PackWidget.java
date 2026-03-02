@@ -1,128 +1,74 @@
 package io.github.fishstiz.packed_packs.gui.components.pack;
 
-import io.github.fishstiz.fidgetz.gui.components.FidgetzText;
-import io.github.fishstiz.fidgetz.gui.renderables.sprites.Sprite;
+import io.github.fishstiz.fidgetz.gui.components.AbstractWidget;
 import io.github.fishstiz.packed_packs.pack.PackAssetManager;
 import io.github.fishstiz.packed_packs.util.constants.Theme;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.client.gui.components.MultiLineLabel;
-import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.util.FormattedCharSequence;
 
-class PackWidget extends AbstractWidget {
-    private static final int DESCRIPTION_LINES = 2;
+import java.util.List;
+
+public class PackWidget extends AbstractWidget {
     private final Pack pack;
-    private final PackAssetManager assetManager;
-    private final FidgetzText<Void> title = FidgetzText.<Void>builder()
-            .setHeight(Minecraft.getInstance().font.lineHeight)
-            .setColor(ChatFormatting.WHITE.getColor())
-            .setShadow(true)
-            .alignLeft()
-            .build();
-    private MultiLineLabel description;
-    private Sprite sprite;
+    private final PackAssetManager assets;
     private final int spacing;
-    private boolean lazyLoaded = false;
+    
+    // Altura estándar del icono de un Resource Pack en Minecraft
+    private static final int ICON_SIZE = 32;
 
-    PackWidget(Pack pack, PackAssetManager assetManager, int x, int y, int width, int height, int spacing) {
-        super(x, y, width, height, pack.getTitle());
-
+    public PackWidget(Pack pack, PackAssetManager assets, int x, int y, int width, int height, int spacing) {
+        super(x, y, width, height, Component.empty());
         this.pack = pack;
-        this.assetManager = assetManager;
-        this.title.setMessage(pack.getTitle());
+        this.assets = assets;
         this.spacing = spacing;
-        this.sprite = PackAssetManager.getDefaultIcon(pack);
-
-        this.cacheDescription();
-    }
-
-    public Sprite getSprite() {
-        return this.sprite;
-    }
-
-    private int getIconSize() {
-        return this.getHeight();
-    }
-
-    private void cacheDescription() {
-        this.description = MultiLineLabel.create(
-                Minecraft.getInstance().font,
-                this.title.getWidth(),
-                DESCRIPTION_LINES,
-                this.pack.getPackSource().decorate(this.pack.getDescription())
-        );
-    }
-
-    @Override
-    public void setWidth(int width) {
-        super.setWidth(width);
-
-        int bodyX = this.spacing * 2 + this.getX() + this.getIconSize();
-        int bodyWidth = this.getRight() - this.spacing * 2 - bodyX;
-
-        if (this.title.getWidth() != bodyWidth) {
-            this.title.setX(bodyX);
-            this.title.setWidth(bodyWidth);
-            this.cacheDescription();
-        }
-    }
-
-    public void onRename(Component title) {
-        this.title.setMessage(title.plainCopy().withStyle(ChatFormatting.GRAY));
-    }
-
-    public int getContentLeft() {
-        return this.title.getX();
-    }
-
-    protected void renderSprite(GuiGraphics guiGraphics, float partialTick) {
-        if (!this.lazyLoaded) { // lazy loads icon as this is not called if not in view
-            this.lazyLoaded = true;
-            this.assetManager.getOrLoadIcon(this.pack, icon -> this.sprite = icon);
-        }
-
-        int x = this.getX() + this.spacing;
-        int y = this.getY();
-        int size = this.getIconSize();
-        this.sprite.render(guiGraphics, x, y, size, size, partialTick);
     }
 
     @Override
     protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        this.renderSprite(guiGraphics, partialTick);
+        Minecraft mc = Minecraft.getInstance();
+        Font font = mc.font;
 
-        int lineHeight = Minecraft.getInstance().font.lineHeight;
-        int totalContentHeight = lineHeight + spacing + (lineHeight * DESCRIPTION_LINES);
-        int startY = this.getY() + (this.getHeight() - totalContentHeight) / 2;
+        int currentX = this.getX() + spacing;
+        int currentY = this.getY();
 
-        this.title.setY(startY);
-        this.title.renderWidget(guiGraphics, mouseX, mouseY, partialTick);
+        // 1. Renderizar el Icono del Pack
+        ResourceLocation iconLocation = this.assets.getIcon(this.pack);
+        guiGraphics.blit(iconLocation, currentX, currentY, 0, 0, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
 
-        this.description.renderLeftAligned(
-                guiGraphics,
-                this.title.getX(),
-                startY + lineHeight + this.spacing,
-                lineHeight,
-                Theme.GRAY_500.getARGB()
-        );
+        // 2. Calcular posición para el texto (a la derecha del icono)
+        int textX = currentX + ICON_SIZE + spacing;
+        int textWidth = this.width - (ICON_SIZE + (spacing * 3));
+
+        // 3. Renderizar Título (Nombre del Pack)
+        // Usamos ARGB para el color (Theme.WHITE suele ser 0xFFFFFFFF)
+        Component title = this.pack.getTitle();
+        guiGraphics.drawString(font, title, textX, currentY + 1, Theme.WHITE.getARGB());
+
+        // 4. Renderizar Descripción (con ajuste de línea si es muy larga)
+        Component description = this.pack.getDescription();
+        List<FormattedCharSequence> lines = font.split(description, textWidth);
+        
+        int descY = currentY + 12; // Un poco debajo del título
+        // En 1.20.1 limitamos a 2 líneas para que quepa en los 32px de alto
+        for (int i = 0; i < Math.min(lines.size(), 2); i++) {
+            guiGraphics.drawString(font, lines.get(i), textX, descY + (i * 10), Theme.GRAY_500.getARGB());
+        }
+    }
+
+    // Método de utilidad para que otros componentes (como el botón de carpeta) 
+    // sepan dónde empieza el contenido de texto.
+    public int getContentLeft() {
+        return this.getX() + spacing + ICON_SIZE + spacing;
     }
 
     @Override
-    public boolean isMouseOver(double mouseX, double mouseY) {
-        return false;
-    }
-
-    @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        return false;
-    }
-
-    @Override
-    protected void updateWidgetNarration(NarrationElementOutput narrationElementOutput) {
-        // unsupported
+    protected void updateWidgetNarration(net.minecraft.client.gui.narration.NarrationElementOutput narrationElementOutput) {
+        // Opcional: Para accesibilidad
+        narrationElementOutput.add(net.minecraft.client.gui.narration.NarratedElementType.TITLE, this.pack.getTitle());
     }
 }
