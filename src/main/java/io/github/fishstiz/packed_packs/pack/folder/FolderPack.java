@@ -5,7 +5,6 @@ import io.github.fishstiz.packed_packs.config.Folder;
 import io.github.fishstiz.packed_packs.transform.interfaces.FilePack;
 import io.github.fishstiz.packed_packs.util.PackUtil;
 import io.github.fishstiz.packed_packs.util.ResourceUtil;
-import io.github.fishstiz.fidgetz.util.lang.ObjectsUtil;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.Util;
 import net.minecraft.network.chat.Component;
@@ -21,7 +20,6 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
@@ -33,15 +31,14 @@ public class FolderPack extends Pack implements FilePack {
     private final Path path;
 
     public FolderPack(String id, String name, Function<FolderPack, List<Pack>> nestedPacksProvider, Path path) {
-        // CONSTRUCTOR MODIFICADO PARA 1.20.1
+        // Constructor de Minecraft 1.20.1
         super(
             id, 
-            true, // isRequired
-            new FolderResourcesSupplier(path), 
+            false, // isRequired (Normalmente false para que se puedan mover)
+            () -> new FolderResources(id, path, false), // ResourcesSupplier
             Component.literal(name), 
             FOLDER_DESCRIPTION, 
             PackCompatibility.COMPATIBLE, 
-            FeatureFlagSet.of(), 
             Pack.Position.TOP, 
             false, // fixedPosition
             PackUtil.PACK_SOURCE
@@ -53,23 +50,24 @@ public class FolderPack extends Pack implements FilePack {
     public List<Pack> flatten() {
         List<Pack> result = new ObjectArrayList<>();
         result.add(this);
-        result.addAll(ObjectsUtil.getOrDefault(this.nestedPacksProvider.apply(this), Collections.emptyList()));
+        List<Pack> nested = this.nestedPacksProvider.apply(this);
+        if (nested != null) {
+            result.addAll(nested);
+        }
         return result;
     }
 
     public CompletableFuture<Folder> loadConfig() {
         return CompletableFuture.supplyAsync(() -> {
             try (PackResources resources = this.open()) {
+                // En 1.20.1 se usa getRootResource directamente
                 var configIoSupplier = resources.getRootResource(FolderResources.FOLDER_CONFIG_FILENAME);
-                if (configIoSupplier == null) {
-                    throw new IOException();
-                }
+                if (configIoSupplier == null) throw new IOException();
+                
                 try (InputStream inputStream = configIoSupplier.get()) {
                     return JsonLoader.loadJson(inputStream, Folder.class);
                 }
-            } catch (NoSuchFileException e) {
-                return ObjectsUtil.peek(new Folder(), this::saveConfig);
-            } catch (IOException e) {
+            } catch (Exception e) {
                 return new Folder();
             }
         }, Util.backgroundExecutor());
