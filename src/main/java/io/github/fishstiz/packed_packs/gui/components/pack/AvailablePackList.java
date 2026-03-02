@@ -132,9 +132,12 @@ public class AvailablePackList extends PackList {
         @Override
         protected void handleDevMenuEvent(PackListDevMenu.Event<?> event) {
             super.handleDevMenuEvent(event);
-            if (event instanceof PackListDevMenu.Event.Require(Pack trigger, Boolean value, List<Pack> required) &&
-                Boolean.TRUE.equals(value)) {
-                this.sendPacks(trigger, required);
+            // REESCRITO PARA JAVA 17
+            if (event instanceof PackListDevMenu.Event.Require) {
+                PackListDevMenu.Event.Require requireEvent = (PackListDevMenu.Event.Require) event;
+                if (Boolean.TRUE.equals(requireEvent.value())) {
+                    this.sendPacks(requireEvent.trigger(), requireEvent.required());
+                }
             }
         }
     }
