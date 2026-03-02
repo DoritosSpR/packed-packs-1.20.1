@@ -1,0 +1,7 @@
+plugins {
+    id 'java-library'
+}
+
+dependencies {
+    // Aquí puedes añadir dependencias específicas de la librería si las necesita
+}
