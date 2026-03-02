@@ -8,7 +8,6 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.FileUtil;
-import net.minecraft.server.packs.PackSelectionConfig;
 import net.minecraft.server.packs.repository.Pack;
 import org.jetbrains.annotations.Nullable;
 
@@ -22,7 +21,8 @@ import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
-import static io.github.fishstiz.fidgetz.util.lang.ObjectsUtil.mapOrDefault;
+// Nota: He quitado la referencia a fidgetz.util.lang.ObjectsUtil.mapOrDefault para evitar dependencias externas rotas
+// Puedes usar Objects.requireNonNull o un helper local.
 
 public class Profile implements PackOptions, Serializable {
     public static final int NAME_MAX_LENGTH = 32;
@@ -58,27 +58,6 @@ public class Profile implements PackOptions, Serializable {
         return this.id;
     }
 
-    boolean remapPackId(String packId, String newId) {
-        boolean remapped = false;
-        if (this.packIds.contains(packId) && !this.packIds.contains(newId)) {
-            List<String> packIdsList = new ObjectArrayList<>(this.packIds);
-            int index = packIdsList.indexOf(packId);
-            if (index != -1) {
-                PackedPacks.LOGGER.info("[packed_packs] Updating pack id '{}' to '{}' in profile '{}'", packId, newId, this.name);
-                packIdsList.add(index, newId);
-                this.packIds = new ObjectLinkedOpenHashSet<>(packIdsList);
-                remapped = true;
-            }
-        }
-        PackOverride packOverride = this.overrides.get(packId);
-        if (packOverride != null) {
-            PackedPacks.LOGGER.info("[packed_packs] Copying overrides from pack id '{}' to '{}' in profile '{}'", packId, newId, this.name);
-            this.overrides.put(newId, packOverride);
-            remapped = true;
-        }
-        return remapped;
-    }
-
     public String getName() {
         return this.name;
     }
@@ -94,11 +73,9 @@ public class Profile implements PackOptions, Serializable {
 
     public Profile copy() {
         String profileName = this.name;
-
         if (profileName != null && !profileName.isBlank()) {
             profileName += " - " + ResourceUtil.getText("profile.copy").getString();
         }
-
         return new Profile(profileName, this.packIds, this.overrides, this.saveFolder);
     }
 
@@ -107,13 +84,12 @@ public class Profile implements PackOptions, Serializable {
     }
 
     public List<String> getPackIds() {
-        return List.copyOf(this.packIds);
+        return new ArrayList<>(this.packIds);
     }
 
     public void setPacks(Collection<Pack> selected) {
         if (!this.locked) {
             selected = PackUtil.flattenPacks(selected);
-
             this.packIds = new ObjectLinkedOpenHashSet<>(PackUtil.extractPackIds(selected));
         }
     }
@@ -122,7 +98,6 @@ public class Profile implements PackOptions, Serializable {
         if (!this.locked) {
             available = PackUtil.flattenPacks(available);
             selected = PackUtil.flattenPacks(selected);
-
             this.packIds = new ObjectLinkedOpenHashSet<>(PackUtil.extractPackIds(selected));
             Set<String> availableIds = new ObjectOpenHashSet<>(PackUtil.extractPackIds(available));
             this.overrides.entrySet().removeIf(entry -> {
@@ -133,31 +108,13 @@ public class Profile implements PackOptions, Serializable {
         }
     }
 
-    public void setHidden(boolean hidden, Collection<Pack> packs) {
-        for (Pack pack : PackUtil.flattenPacks(packs)) {
-            this.setHidden(hidden, pack);
-        }
-    }
-
     public void setHidden(boolean hidden, Pack pack) {
         this.applyOrRemoveOverride(pack.getId(), hidden ? true : null, PackOverride::setHidden);
-    }
-
-    public void setRequired(@Nullable Boolean required, Collection<Pack> packs) {
-        for (Pack pack : PackUtil.flattenPacks(packs)) {
-            this.setRequired(required, pack);
-        }
     }
 
     public void setRequired(@Nullable Boolean required, Pack pack) {
         if (!Boolean.FALSE.equals(required) || !PackUtil.isEssential(pack)) {
             this.applyOrRemoveOverride(pack.getId(), required, PackOverride::setRequired);
-        }
-    }
-
-    public void setPosition(@Nullable PackOverride.Position position, Collection<Pack> packs) {
-        for (Pack pack : PackUtil.flattenPacks(packs)) {
-            this.setPosition(position, pack);
         }
     }
 
@@ -175,18 +132,21 @@ public class Profile implements PackOptions, Serializable {
 
     @Override
     public boolean isHidden(Pack pack) {
-        return Boolean.TRUE.equals(mapOrDefault(this.overrides.get(pack.getId()), false, PackOverride::hidden));
+        PackOverride o = this.overrides.get(pack.getId());
+        return o != null && Boolean.TRUE.equals(o.hidden());
     }
 
     @Override
     public boolean isRequired(Pack pack) {
-        return Boolean.TRUE.equals(mapOrDefault(this.overrides.get(pack.getId()), false, PackOverride::required));
+        PackOverride o = this.overrides.get(pack.getId());
+        return o != null && Boolean.TRUE.equals(o.required());
     }
 
     @Override
     public boolean isFixed(Pack pack) {
         if (this.overridesPosition(pack)) {
-            return Objects.requireNonNull(this.overrides.get(pack.getId()).position()).fixed();
+            PackOverride.Position pos = this.overrides.get(pack.getId()).position();
+            return pos != null && pos.fixed();
         }
         return false;
     }
@@ -194,43 +154,15 @@ public class Profile implements PackOptions, Serializable {
     @Override
     public @Nullable Pack.Position getPosition(Pack pack) {
         if (this.overridesPosition(pack)) {
-            return Objects.requireNonNull(this.overrides.get(pack.getId()).position()).get(pack);
+            PackOverride.Position pos = this.overrides.get(pack.getId()).position();
+            return pos != null ? pos.get(pack) : null;
         }
         return null;
-    }
-
-    public @Nullable PackOverride.Position getPositionOverride(Pack pack) {
-        if (this.overridesPosition(pack)) {
-            return this.overrides.get(pack.getId()).position();
-        }
-        return null;
-    }
-
-    @Override
-    public @Nullable PackSelectionConfig getSelectionConfig(Pack pack) {
-        PackOverride packEntry = this.overrides.get(pack.getId());
-        if (packEntry != null && (packEntry.required() != null || packEntry.position() != null)) {
-            return new PackSelectionConfig(this.isRequired(pack), this.getPosition(pack), this.isFixed(pack));
-        }
-        return null;
-    }
-
-    public boolean overridesRequired(Pack pack) {
-        return this.overridesProperty(pack, PackOverride::required);
     }
 
     public boolean overridesPosition(Pack pack) {
-        return this.overridesProperty(pack, PackOverride::position);
-    }
-
-    private boolean overridesProperty(Pack pack, Function<PackOverride, @Nullable Object> property) {
         PackOverride entry = this.overrides.get(pack.getId());
-        return entry != null && property.apply(entry) != null;
-    }
-
-    public boolean hasOverride(Pack pack) {
-        PackOverride entry = this.overrides.get(pack.getId());
-        return entry != null && entry.hasOverride();
+        return entry != null && entry.position() != null;
     }
 
     private <T> void applyOrRemoveOverride(String packId, T property, BiConsumer<PackOverride, T> setter) {
@@ -250,11 +182,8 @@ public class Profile implements PackOptions, Serializable {
 
     private static String findAvailableId(Path saveFolder, String name) {
         try {
-            return removeExtension(FileUtil.findAvailableName(
-                    Objects.requireNonNull(saveFolder, "saveFolder"),
-                    Objects.requireNonNull(name, "name"),
-                    PROFILE_EXTENSION
-            ));
+            // En 1.20.1 FileUtil.findAvailableName devuelve la ruta completa o el nombre con incremento
+            return removeExtension(FileUtil.findAvailableName(saveFolder, name, PROFILE_EXTENSION));
         } catch (IOException e) {
             return createTempId();
         }
@@ -262,31 +191,5 @@ public class Profile implements PackOptions, Serializable {
 
     static String removeExtension(String id) {
         return id.replaceFirst(PROFILE_EXTENSION_QUOTE + "$", "");
-    }
-
-    public boolean isTemp() {
-        return this.temp;
-    }
-
-    @Override
-    public int hashCode() {
-        return this.id.hashCode();
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (obj == null) {
-            return false;
-        }
-        if (obj == this) {
-            return true;
-        }
-        if (!(obj instanceof Profile other)) {
-            return false;
-        }
-        if (Objects.equals(other.getId(), this.getId())) {
-            return true;
-        }
-        return false;
     }
 }
