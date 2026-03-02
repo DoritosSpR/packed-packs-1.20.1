@@ -3,16 +3,11 @@ package io.github.fishstiz.packed_packs.gui.screens;
 import io.github.fishstiz.fidgetz.gui.components.ToggleableDialogContainer;
 import io.github.fishstiz.packed_packs.gui.components.events.PackListEvent;
 import io.github.fishstiz.packed_packs.gui.components.events.PackListEventListener;
-import io.github.fishstiz.packed_packs.gui.components.pack.FileRenameModal;
-import io.github.fishstiz.packed_packs.gui.components.pack.FolderDialog;
 import io.github.fishstiz.packed_packs.gui.components.pack.PackList;
-import io.github.fishstiz.packed_packs.gui.components.pack.PackListDevMenu;
 import io.github.fishstiz.packed_packs.gui.screens.history.PackStateHistory;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.server.packs.repository.Pack;
 
-import java.util.List;
-
+// Importaciones estáticas corregidas para PackListEvent
 import static io.github.fishstiz.packed_packs.gui.components.events.PackListEvent.*;
 
 public abstract class PackListEventHandler<S extends Screen & ToggleableDialogContainer & PackListEventListener> extends PackListScreen<S> implements PackListEventListener {
@@ -24,8 +19,7 @@ public abstract class PackListEventHandler<S extends Screen & ToggleableDialogCo
 
     @Override
     public void onEvent(PackListEvent event) {
-        super.onEvent(event);
-
+        // Lógica de reseteo de UI
         this.profiles.getSidebar().setOpen(false);
         this.contextMenu.setOpen(false);
         this.fileRenameModal.setOpen(false);
@@ -34,23 +28,21 @@ public abstract class PackListEventHandler<S extends Screen & ToggleableDialogCo
         boolean notFolderDialogEvent = event.target() != this.folderDialog.root();
         if (notFolderDialogEvent) this.folderDialog.setOpen(false);
 
-        // REESCRITO PARA JAVA 17: Reemplazo de switch pattern por if-instanceof
+        // JAVA 17: Pattern Matching simplificado
         if (event instanceof FileDeleteEvent) {
             this.revalidatePacks();
-        } else if (event instanceof FileRenameOpenEvent) {
-            FileRenameOpenEvent e = (FileRenameOpenEvent) event;
+        } else if (event instanceof FileRenameOpenEvent e) {
             this.fileRenameModal.open(e.target(), e.trigger());
-        } else if (event instanceof FileRenameEvent) {
-            this.onFileRename((FileRenameEvent) event);
-        } else if (event instanceof FileRenameCloseEvent) {
-            FileRenameCloseEvent e = (FileRenameCloseEvent) event;
+        } else if (event instanceof FileRenameEvent e) {
+            this.onFileRename(e);
+        } else if (event instanceof FileRenameCloseEvent e) {
             this.focusList(e.target());
-        } else if (event instanceof FolderOpenEvent) {
-            this.onFolderOpen((FolderOpenEvent) event);
-        } else if (event instanceof FolderCloseEvent) {
-            this.onFolderClose((FolderCloseEvent) event);
-        } else if (event instanceof PackAliasOpenEvent) {
-            this.onOpenAliases((PackAliasOpenEvent) event);
+        } else if (event instanceof FolderOpenEvent e) {
+            this.onFolderOpen(e);
+        } else if (event instanceof FolderCloseEvent e) {
+            this.onFolderClose(e);
+        } else if (event instanceof PackAliasOpenEvent e) {
+            this.onOpenAliases(e);
         }
 
         if (this.isUnlocked() && event.pushToHistory() && notFolderDialogEvent) {
@@ -60,8 +52,7 @@ public abstract class PackListEventHandler<S extends Screen & ToggleableDialogCo
 
     @Override
     public void onSelection(SelectionEvent event) {
-        // REESCRITO PARA JAVA 17
-        if (event instanceof SelectionEvent) {
+        if (event != null) {
             this.unfocusOtherLists(event.target());
         }
     }
@@ -85,12 +76,8 @@ public abstract class PackListEventHandler<S extends Screen & ToggleableDialogCo
     }
 
     protected abstract void revalidatePacks();
-
     protected abstract void focusList(PackList packList);
-
     protected abstract void unfocusOtherLists(PackList packList);
-
     protected abstract PackStateHistory.State captureState();
-
     protected abstract boolean isUnlocked();
 }
