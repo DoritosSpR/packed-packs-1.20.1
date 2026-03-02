@@ -3,6 +3,7 @@ plugins {
     id 'idea'
     id 'maven-publish'
     id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+    id 'org.spongepowered.mixin' version '0.7.+'
 }
 
 version = mod_version
@@ -41,10 +42,16 @@ minecraft {
     }
 }
 
+// Configuración de Mixin (debe ir después de minecraft y antes de dependencies)
+mixin {
+    add sourceSets.main, "packed_packs.refmap.json"
+    config "packed_packs.mixins.json"
+}
+
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 repositories {
-    mavenCentral()
+    mainCentral()
     maven { url 'https://jitpack.io' }
     maven { url 'https://repo.spongepowered.org/repository/maven-public/' }
 }
@@ -52,9 +59,9 @@ repositories {
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
-    // MixinExtras: Fundamental para que funcionen @WrapOperation y otros
-    compileOnly annotationProcessor("com.github.LlamaLad7:MixinExtras:0.1.1")
-    implementation ("com.github.LlamaLad7:MixinExtras:0.1.1")
+    // MixinExtras corregido para Forge 1.20.1
+    compileOnly annotationProcessor("io.github.llamalad7:mixinextras-common:0.4.0")
+    implementation "io.github.llamalad7:mixinextras-forge:0.4.0"
 
     implementation project(path: ':fidgetz:common', configuration: 'default')
     implementation project(path: ':fidgetz:forge', configuration: 'default')
@@ -62,13 +69,6 @@ dependencies {
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
 
-// Añade esto al final para que Mixin sepa qué archivos procesar
-mixin {
-    add sourceSets.main, "packed_packs.refmap.json"
-    config "packed_packs.mixins.json"
-}
-
-// ESTA SECCIÓN HA SIDO CORREGIDA PARA EVITAR EL ERROR "Unexpected input: '{'"
 processResources {
     var replaceProperties = [
             minecraft_version: minecraft_version, 
@@ -99,7 +99,8 @@ tasks.named('jar', Jar).configure {
                 'Implementation-Title'    : project.name,
                 'Implementation-Version'  : project.jar.archiveVersion,
                 'Implementation-Vendor'   : mod_authors,
-                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
+                'MixinConfigs'            : 'packed_packs.mixins.json'
         ])
     }
     finalizedBy 'reobfJar'
@@ -121,5 +122,3 @@ publishing {
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
-
-
