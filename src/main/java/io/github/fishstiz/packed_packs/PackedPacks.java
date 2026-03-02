@@ -18,16 +18,6 @@ public class PackedPacks {
     public PackedPacks() {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
-        // 1. Inicializar el API interno (Esto conecta impl con api)
-        // Normalmente esto registra los eventos y las preferencias
-        io.github.fishstiz.packed_packs.impl.PackedPacksApiImpl.init(); 
-
-        LOGGER.info("Packed Packs para Forge 1.20.1 inicializado.");
-    }
-
-    public PackedPacks() {
-        IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
-
         // Esto fuerza la carga del API y congela los registros
         PackedPacksApiImpl.getInstance();
 
