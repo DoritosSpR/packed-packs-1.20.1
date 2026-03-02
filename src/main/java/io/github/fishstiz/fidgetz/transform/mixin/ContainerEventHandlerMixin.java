@@ -17,11 +17,18 @@ import java.util.List;
 @Mixin({Screen.class, AbstractWidget.class})
 public abstract class ContainerEventHandlerMixin implements ContainerEventHandler {
 
-    // En 1.20.1, el método puede ser m_264152_ (handleTabNavigation en official)
-    @WrapOperation(method = "handleTabNavigation", at = @At(
+    /**
+     * Usamos el nombre intermedio/mapeado para asegurar que Mixin lo encuentre en 1.20.1
+     * Si "handleTabNavigation" falla, usamos el selector de parámetros explícito.
+     */
+    @WrapOperation(
+        method = "handleTabNavigation(Lnet/minecraft/client/gui/navigation/ScreenDirection;)Z", 
+        at = @At(
             value = "NEW",
             target = "(Ljava/util/Collection;)Ljava/util/ArrayList;"
-    ), remap = true)
+        ),
+        remap = true
+    )
     private ArrayList<GuiEventListener> fidgetz$filterTab(Collection<GuiEventListener> children, Operation<ArrayList<GuiEventListener>> original) {
         if (this instanceof ToggleableDialogContainer dialog) {
             return fidgetz$filter(dialog, children);
@@ -33,8 +40,10 @@ public abstract class ContainerEventHandlerMixin implements ContainerEventHandle
     private ArrayList<GuiEventListener> fidgetz$filter(ToggleableDialogContainer self, Collection<? extends GuiEventListener> children) {
         ArrayList<GuiEventListener> focusable = new ArrayList<>();
         for (GuiEventListener child : children) {
-            // Aquí asumo que isChildCovered es un método de tu interfaz
-            focusable.add(child); 
+            // Filtramos los elementos que están cubiertos por un diálogo/modal
+            if (!self.isChildCovered(child)) {
+                focusable.add((GuiEventListener) child);
+            }
         }
         return focusable;
     }
