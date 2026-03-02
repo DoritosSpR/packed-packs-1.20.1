@@ -1,3 +1,7 @@
+rootProject.name = 'packed-packs'
+include 'fidgetz:common'
+include 'fidgetz:forge'
+
 pluginManagement {
     repositories {
         gradlePluginPortal()
@@ -10,4 +14,5 @@ pluginManagement {
 
 plugins {
     id 'org.gradle.toolchains.foojay-resolver-convention' version '0.7.0'
+
 }
