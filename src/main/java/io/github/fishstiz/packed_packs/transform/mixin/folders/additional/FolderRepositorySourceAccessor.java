@@ -1,6 +1,7 @@
 package io.github.fishstiz.packed_packs.transform.mixin.folders.additional;
 
 import net.minecraft.server.packs.repository.FolderRepositorySource;
+import net.minecraft.server.packs.repository.PackSource;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
@@ -10,4 +11,7 @@ import java.nio.file.Path;
 public interface FolderRepositorySourceAccessor {
     @Accessor("folder")
     Path packed_packs$getFolder();
+
+    @Accessor("packSource")
+    PackSource packed_packs$getPackSource();
 }
