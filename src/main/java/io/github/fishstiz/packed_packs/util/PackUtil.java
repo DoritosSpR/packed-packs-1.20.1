@@ -1,7 +1,5 @@
 package io.github.fishstiz.packed_packs.util;
 
-// Eliminamos com.sun.jna.platform.FileUtils si da problemas y usamos commons-io o java.nio
-import io.github.fishstiz.packed_packs.PackedPacks;
 import io.github.fishstiz.packed_packs.pack.folder.FolderPack;
 import io.github.fishstiz.packed_packs.pack.folder.FolderResources;
 import io.github.fishstiz.packed_packs.transform.interfaces.FilePack;
@@ -18,17 +16,17 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
+import java.util.stream.Stream;
 
 public class PackUtil {
     public static final String HIGH_CONTRAST_ID = "high_contrast";
     public static final String VANILLA_ID = "vanilla";
-    public static final String FABRIC_ID = "fabric";
     public static final String ZIP_PACK_EXTENSION = ".zip";
     public static final String ICON_FILENAME = "pack.png";
     
-    // En 1.20.1 PackSource.create recibe un decorador de nombre y un booleano
+    // En 1.20.1 PackSource.create recibe un decorador de nombre y un booleano (si es fijo)
     public static final PackSource PACK_SOURCE = PackSource.create(name -> 
-            Component.translatable("pack.nameAndSource", name, ResourceUtil.getModName().copy().withStyle(ChatFormatting.YELLOW))
+            Component.translatable("pack.nameAndSource", name, Component.literal("Packed Packs").withStyle(ChatFormatting.YELLOW))
                     .withStyle(ChatFormatting.GRAY), false);
 
     private static final String FILE_PREFIX = "file/";
@@ -52,15 +50,45 @@ public class PackUtil {
         return generatePackId(generatePackName(path));
     }
 
-    public static String generateNestedPackId(Path path) {
-        return FILE_PREFIX + generatePackName(path.getParent()) + DELIMITER + generatePackName(path);
+    // Métodos añadidos para solucionar errores de compilación previos:
+    
+    public static boolean hasFolderConfig(Path path) {
+        return Files.exists(path.resolve(FolderResources.FOLDER_CONFIG_FILENAME));
     }
 
-    public static long getLastUpdatedEpochMs(Pack pack) {
-        if (!(pack instanceof FilePack filePack)) return -1;
-        Path path = filePack.packed_packs$getPath();
-        if (path == null) return -1;
+    public static Path validatePackPath(Pack pack) {
+        if (pack instanceof FilePack filePack) {
+            return filePack.packed_packs$getPath();
+        }
+        return null;
+    }
 
+    public static boolean renamePath(Path source, Path target) {
+        try {
+            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    public static void openParent(Pack pack) {
+        Path path = validatePackPath(pack);
+        if (path != null && path.getParent() != null) {
+            Util.getPlatform().openFile(path.getParent().toFile());
+        }
+    }
+
+    public static boolean isFeature(Pack pack) {
+        // En 1.20.1 los packs de "features" suelen identificarse por el ID o el origen
+        return pack.getId().startsWith("fabric/") || pack.getId().startsWith("legacy/");
+    }
+
+    // --- Fin de métodos añadidos ---
+
+    public static long getLastUpdatedEpochMs(Pack pack) {
+        Path path = validatePackPath(pack);
+        if (path == null) return -1;
         try {
             return Files.getLastModifiedTime(path).toInstant().toEpochMilli();
         } catch (IOException e) {
@@ -77,7 +105,6 @@ public class PackUtil {
     }
 
     public static boolean isBuiltIn(Pack pack) {
-        // Simplificado para Forge 1.20.1
         return pack.getPackSource() == PackSource.BUILT_IN;
     }
 
@@ -102,20 +129,20 @@ public class PackUtil {
     }
 
     public static void openPack(Pack pack) {
-        if (pack instanceof FilePack filePack) {
-            Path path = filePack.packed_packs$getPath();
-            if (path != null) Util.getPlatform().openFile(path.toFile());
+        Path path = validatePackPath(pack);
+        if (path != null) {
+            Util.getPlatform().openFile(path.toFile());
         }
     }
 
     public static boolean deletePath(Path path) {
         try {
             if (Files.isDirectory(path)) {
-                // Usamos el borrado simple si no quieres dependencias pesadas
-                Files.walk(path)
-                     .sorted(Comparator.reverseOrder())
-                     .map(Path::toFile)
-                     .forEach(File::delete);
+                try (Stream<Path> walk = Files.walk(path)) {
+                    walk.sorted(Comparator.reverseOrder())
+                        .map(Path::toFile)
+                        .forEach(File::delete);
+                }
             } else {
                 Files.deleteIfExists(path);
             }
@@ -129,7 +156,7 @@ public class PackUtil {
         PathValidationResults results = new PathValidationResults(paths);
         for (Path path : paths) {
             if (Files.exists(path)) {
-                if (hasMcmeta(path) || path.toString().endsWith(ZIP_PACK_EXTENSION)) {
+                if (hasMcmeta(path) || path.toString().endsWith(ZIP_PACK_EXTENSION) || hasFolderConfig(path)) {
                     results.addValid(path);
                 }
             }
