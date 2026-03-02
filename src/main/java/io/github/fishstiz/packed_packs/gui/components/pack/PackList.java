@@ -1,222 +1,488 @@
-package io.github.fishstiz.packed_packs.gui.components;
+package io.github.fishstiz.packed_packs.gui.components.pack;
 
-import com.google.common.primitives.Ints;
-import io.github.fishstiz.packed_packs.util.lang.IntsUtil;
+import io.github.fishstiz.fidgetz.gui.components.*;
+import io.github.fishstiz.fidgetz.gui.components.contextmenu.ContextMenuContainer;
+import io.github.fishstiz.fidgetz.gui.renderables.ColoredRect;
+import io.github.fishstiz.packed_packs.api.events.ScreenEvent;
+import io.github.fishstiz.packed_packs.config.Config;
+import io.github.fishstiz.packed_packs.config.Preferences;
+import io.github.fishstiz.packed_packs.gui.components.MouseSelectionHandler;
+import io.github.fishstiz.packed_packs.gui.components.SelectionContext;
+import io.github.fishstiz.packed_packs.gui.components.events.PackListEventListener;
+import io.github.fishstiz.packed_packs.gui.history.Restorable;
+import io.github.fishstiz.packed_packs.gui.components.ToggleableHelper;
+import io.github.fishstiz.packed_packs.pack.PackAssetManager;
+import io.github.fishstiz.packed_packs.pack.PackFileOperations;
+import io.github.fishstiz.packed_packs.pack.PackOptionsContext;
+import io.github.fishstiz.packed_packs.transform.mixin.gui.AbstractSelectionListAccessor;
+import io.github.fishstiz.packed_packs.util.PackUtil;
+import io.github.fishstiz.packed_packs.util.constants.GuiConstants;
+import io.github.fishstiz.packed_packs.util.constants.Theme;
+import io.github.fishstiz.packed_packs.gui.components.events.*;
+import io.github.fishstiz.packed_packs.pack.folder.FolderPack;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
-import net.minecraft.util.Mth;
+import net.minecraft.client.gui.ComponentPath;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Renderable;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.narration.NarratableEntry;
+import net.minecraft.client.gui.navigation.FocusNavigationEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.packs.repository.Pack;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
-import java.util.function.Predicate;
 
-public class SelectableList<T> {
-    protected final List<T> items = new ObjectArrayList<>();
-    protected final List<T> selectedItems = new ObjectArrayList<>();
-    protected final List<T> visibleItems = new ObjectArrayList<>();
-    private final Predicate<T> filter;
+import static io.github.fishstiz.fidgetz.util.GuiUtil.playClickSound;
+import static io.github.fishstiz.packed_packs.util.InputUtil.*;
+import static io.github.fishstiz.fidgetz.util.lang.ObjectsUtil.*;
 
-    public SelectableList(Predicate<T> filter) {
-        this.filter = filter;
+public abstract class PackList extends AbstractFixedListWidget<PackList.Entry> implements
+        Restorable<PackList.Snapshot>,
+        ContainerEventHandlerPatch,
+        ContextMenuContainer {
+    protected static final int OFFSET_Y = 2;
+    protected static final int ITEM_HEIGHT = 32;
+    protected static final int ROW_GAP = 3;
+    protected final PackOptionsContext options;
+    protected final PackAssetManager assets;
+    protected final PackListModel list;
+    private final PackFileOperations fileOps;
+    private final PackListEventListener listener;
+
+    protected PackList(PackOptionsContext options, PackAssetManager assets, PackFileOperations fileOps, PackListEventListener listener) {
+        super(ITEM_HEIGHT, DEFAULT_SCROLLBAR_OFFSET, OFFSET_Y, ROW_GAP);
+        this.options = options;
+        this.assets = assets;
+        this.fileOps = fileOps;
+        this.listener = listener;
+        this.list = new PackListModel(this.options);
     }
 
-    public SelectableList() {
-        this(Objects::nonNull);
-    }
+    protected abstract @NotNull Entry createEntry(SelectionContext<Pack> context, int index);
 
-    public List<T> getItems() {
-        return Collections.unmodifiableList(this.items);
-    }
-
-    public List<T> getSelection() {
-        return Collections.unmodifiableList(this.selectedItems);
-    }
-
-    public List<T> getVisibleItems() {
-        return Collections.unmodifiableList(this.visibleItems);
-    }
-
-    public int size() {
-        return this.items.size();
-    }
-
-    public boolean isEmpty() {
-        return this.items.isEmpty();
-    }
-
-    public int indexOf(T item) {
-        return this.items.indexOf(item);
-    }
-
-    protected boolean filter(T item) {
-        return this.filter.test(item);
-    }
-
-    public void refresh() {
-        this.visibleItems.clear();
-        for (T item : this.items) {
-            if (this.filter(item)) {
-                this.visibleItems.add(item);
-            }
+    public @Nullable Entry getEntry(@Nullable Pack pack) {
+        if (pack == null) return null;
+        for (Entry entry : this.children()) {
+            if (Objects.equals(entry.pack(), pack)) return entry;
         }
-        this.selectedItems.retainAll(this.visibleItems);
+        return null;
     }
 
-    public void add(T item) {
-        this.items.add(item);
-    }
+    private void refreshEntries() {
+        Entry focused = this.getFocused();
+        List<Pack> selection = this.list.getSelection();
+        List<Pack> visiblePacks = this.list.getVisibleItems();
 
-    public void replaceAll(Collection<T> items) {
-        this.items.clear();
-        Set<T> seen = new ObjectOpenHashSet<>(items.size());
-        for (T item : items) {
-            if (item != null && seen.add(item)) {
-                this.items.add(item);
-            }
-        }
-    }
-
-    public boolean remove(T item) {
-        boolean removed = this.items.remove(item);
-        this.selectedItems.remove(item);
-        this.visibleItems.remove(item);
-        return removed;
-    }
-
-    public void insertOrMove(int index, T item) {
-        int previous = this.items.indexOf(item);
-        if (previous != -1 && previous < index) {
-            index--;
+        this.clearEntries();
+        for (int i = 0; i < visiblePacks.size(); i++) {
+            Entry entry = this.createEntry(new SelectionContext<>(selection, visiblePacks.get(i)), i);
+            this.addEntry(entry);
+            listener.postApiEvent(new ScreenEvent.InitPackEntry(listener.ctx(), entry));
         }
 
-        this.items.remove(item);
-        // Cambio: Math.clamp (Java 21) -> Mth.clamp (Minecraft/Java 17)
-        this.items.add(Mth.clamp(index, 0, this.items.size()), item);
+        this.clampScrollAmount();
+        this.setFocused(mapOrNull(focused, f -> this.getEntry(f.pack())));
     }
 
-    public boolean move(int index, T item) {
-        int from = this.items.indexOf(item);
-        if (from == -1 || index < 0 || index >= this.items.size() || from == index) {
-            return false;
-        }
-
-        this.items.remove(from);
-        this.items.add(index, item);
-        return true;
+    protected void refreshList() {
+        this.list.refresh();
+        this.refreshEntries();
     }
 
-    public boolean moveAll(int index, List<T> selection) {
-        if (selection == null || selection.isEmpty() || index < 0 || index > this.items.size()) {
-            return false;
-        }
-        if (!new ObjectOpenHashSet<>(this.items).containsAll(selection)) {
-            return false;
-        }
-
-        selection = this.orderByVisible(selection);
-
-        int to = index;
-        for (T item : selection) {
-            int from = this.items.indexOf(item);
-            if (from < index) to--;
-        }
-
-        this.items.removeAll(selection);
-        this.items.addAll(to, selection);
-        return true;
+    public void scrollToTop() {
+        this.setScrollAmount(0);
     }
 
-    public T getLastSelected() {
-        // Cambio: .getLast() -> .get(size - 1)
-        return !this.selectedItems.isEmpty() ? this.selectedItems.get(this.selectedItems.size() - 1) : null;
+    public void reload(Collection<Pack> packs) {
+        this.list.replaceAll(packs);
+        this.setFocused(null);
+        this.refresh();
+    }
+
+    public @NotNull List<Pack> copyPacks() {
+        return List.copyOf(this.list.getItems());
+    }
+
+    public List<Pack> getOrderedSelection() {
+        return this.list.getOrderedSelection();
     }
 
     public void clearSelection() {
-        this.selectedItems.clear();
+        this.list.clearSelection();
     }
 
-    public boolean isSelected(T item) {
-        return this.selectedItems.contains(item);
+    private void refresh() {
+        this.clearSelection();
+        this.refreshList();
+        this.scrollToTop();
     }
 
-    public void unselect(T item) {
-        this.selectedItems.remove(item);
+    public void sort(Query.SortOption sort) {
+        if (this.list.sort(sort)) {
+            this.refresh();
+        }
     }
 
-    public boolean select(T item) {
-        if (item != null && this.visibleItems.contains(item)) {
-            this.selectedItems.remove(item);
-            this.selectedItems.add(item);
+    public void hideIncompatible(boolean hideIncompatible) {
+        if (this.list.hideIncompatible(hideIncompatible)) {
+            this.clearSelection();
+            this.refreshList();
+        }
+    }
+
+    public void search(@NotNull String search) {
+        if (this.list.search(search)) {
+            this.refresh();
+        }
+    }
+
+    public boolean isQueried() {
+        return this.list.isQueried();
+    }
+
+    public void addAll(List<Pack> packs) {
+        for (Pack pack : packs) {
+            this.list.add(pack);
+        }
+        this.refreshList();
+    }
+
+    public void addOrMove(Pack pack, int to) {
+        this.list.insertOrMove(to, pack);
+        this.list.select(pack);
+    }
+
+    public boolean moveAll(List<Pack> selection, int to) {
+        if (this.list.moveAll(to, selection)) {
+            this.refreshList();
             return true;
         }
         return false;
     }
 
-    public void selectRange(T targetItem) {
-        T anchor = this.getLastSelected();
-        int anchorIndex = this.visibleItems.indexOf(anchor);
-        int targetIndex = this.visibleItems.indexOf(targetItem);
-        int[] indices = this.getSelectionVisibleIndices();
-        Arrays.sort(indices);
+    private boolean removePack(Pack pack) {
+        Entry focused = this.getFocused();
+        if (this.list.remove(pack)) {
+            if (focused != null && focused.pack().getId().equals(pack.getId())) {
+                this.setFocused(null);
+            }
+            return true;
+        }
+        return false;
+    }
 
-        if (!(Ints.contains(indices, -1) || IntsUtil.hasGap(indices, true)) && indices.length > 0) {
-            if (indices[0] == anchorIndex) {
-                anchor = this.visibleItems.get(indices[indices.length - 1]);
-            } else if (indices[indices.length - 1] == anchorIndex) {
-                anchor = this.visibleItems.get(indices[0]);
+    public void remove(Pack pack) {
+        this.removePack(pack);
+        this.refreshList();
+    }
+
+    public void removeAll(List<Pack> packs) {
+        boolean removed = false;
+        for (Pack pack : packs) {
+            removed |= this.removePack(pack);
+        }
+        if (removed) {
+            this.refreshList();
+        }
+    }
+
+    public @Nullable Pack getLastSelected() {
+        return this.list.getLastSelected();
+    }
+
+    @Override
+    public @Nullable Entry getSelected() {
+        return this.getLastSelected() != null ? this.getEntry(this.getLastSelected()) : super.getSelected();
+    }
+
+    public boolean isSelected(Pack pack) {
+        return this.list.isSelected(pack);
+    }
+
+    public void scrollToLastSelected() {
+        ifPresent(this.getEntry(this.getLastSelected()), this::ensureVisible);
+    }
+
+    public void unselect(Pack pack) {
+        this.list.unselect(pack);
+        Entry entry = this.getEntry(pack);
+        if (entry == this.getFocused()) this.setFocused(null);
+        if (entry == this.getSelected()) this.setSelected(null);
+    }
+
+    public void select(Pack pack) {
+        if (this.list.select(pack)) {
+            Entry entry = this.getEntry(pack);
+            this.setFocused(entry);
+            this.setSelected(entry);
+        }
+    }
+
+    public void selectAll() {
+        this.list.getVisibleItems().forEach(this::select);
+    }
+
+    public void selectAll(List<Pack> packs) {
+        packs.forEach(this::select);
+    }
+
+    public void selectExclusive(Pack pack) {
+        this.clearSelection();
+        this.select(pack);
+    }
+
+    public void selectToggle(Pack pack) {
+        if (this.isSelected(pack)) this.unselect(pack);
+        else this.select(pack);
+    }
+
+    public void selectRange(Pack pack) {
+        this.list.selectRange(pack);
+        this.select(pack);
+    }
+
+    public boolean isTransferable(Pack pack) {
+        return testNullable(this.getEntry(pack), PackList.Entry::isTransferable);
+    }
+
+    public void transferAll() {
+        List<Pack> payload = new ArrayList<>();
+        List<Pack> visiblePacks = this.list.getVisibleItems();
+        for (int i = visiblePacks.size() - 1; i >= 0; i--) {
+            Pack pack = visiblePacks.get(i);
+            if (this.isTransferable(pack)) payload.add(pack);
+        }
+        if (!payload.isEmpty()) {
+            this.sendEvent(new RequestTransferEvent(this, this.getLastSelected(), payload));
+        }
+    }
+
+    protected void sendEvent(PackListEvent event) {
+        this.listener.onEvent(event);
+    }
+
+    public abstract boolean canInteract(PackList source);
+    protected abstract boolean canDrop(DragEvent dragEvent, double mouseX, double mouseY);
+    protected abstract List<Pack> handleDrop(DragEvent dragEvent, double mouseX, double mouseY);
+    public abstract void renderDroppableZone(GuiGraphics guiGraphics, DragEvent dragEvent, int mouseX, int mouseY, float partialTick);
+
+    public final void drop(DragEvent dragEvent, double mouseX, double mouseY) {
+        if (this.options.isLocked()) return;
+        List<Pack> dropped = this.handleDrop(dragEvent, mouseX, mouseY);
+        if (!dropped.isEmpty()) {
+            if (dragEvent.target() != this) {
+                this.sendEvent(new DropEvent(dragEvent.target(), this, dropped));
+            } else {
+                this.sendEvent(new MoveEvent(this, dragEvent.trigger(), dropped));
+            }
+        }
+    }
+
+    protected void openFolder(FolderPack folderPack) {
+        this.sendEvent(new FolderOpenEvent(this, folderPack));
+    }
+
+    private @Nullable ComponentPath handleArrowNavigation(FocusNavigationEvent.ArrowNavigation arrowNavigation) {
+        Entry entry = switch (arrowNavigation.direction()) {
+            case UP -> this.getPreviousEntry();
+            case DOWN -> this.getNextEntry();
+            default -> null;
+        };
+        if (entry != null) {
+            if (isRangeModifierActive()) this.selectRange(entry.pack());
+            else this.selectExclusive(entry.pack());
+            this.sendEvent(new SelectionEvent(this));
+            this.ensureVisible(entry);
+            return ComponentPath.path(entry, this);
+        }
+        this.setFocused(null);
+        return null;
+    }
+
+    @Override
+    public @Nullable ComponentPath nextFocusPath(FocusNavigationEvent event) {
+        if (!this.isFocused()) {
+            Pack lastSelected = this.getLastSelected();
+            Entry entry = (lastSelected != null) ? this.getEntry(lastSelected) : (!this.children().isEmpty() ? this.children().get(0) : null);
+            if (entry != null) {
+                this.select(entry.pack());
+                this.ensureVisible(entry);
+                return ComponentPath.path(entry, this);
+            }
+        } else if (event instanceof FocusNavigationEvent.ArrowNavigation arrowNavigation) {
+            return this.handleArrowNavigation(arrowNavigation);
+        }
+        return null;
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        Entry entry = this.getEntry(this.getLastSelected());
+        if (isExpandFolder(keyCode, modifiers) && entry != null && entry.folderWidget != null && this.list.getSelection().size() == 1) {
+            this.openFolder(entry.folderWidget.getMetadata());
+            return true;
+        }
+        if (isTransfer(keyCode, modifiers)) {
+            if (entry != null && entry.transfer()) playClickSound();
+            return entry != null;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (this.isValidMouseClick(button)) this.updateScrollingState(mouseX, mouseY, button);
+        if (!this.isMouseOver(mouseX, mouseY)) return false;
+        return ContainerEventHandlerPatch.super.mouseClickedAt(mouseX, mouseY, button) || ((AbstractSelectionListAccessor) this).packed_packs$scrolling();
+    }
+
+    @Override
+    protected void renderListItems(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        super.renderListItems(guiGraphics, mouseX, mouseY, partialTick);
+        Entry focused = this.getFocused();
+        if (focused != null && focused.isFocused() && this.children().contains(focused)) {
+            guiGraphics.renderOutline(focused.getX(), focused.getY() - Entry.BACKGROUND_OFFSET, focused.getWidth(), focused.getHeight() + Entry.BACKGROUND_OFFSET * 2, Theme.WHITE.getARGB());
+        }
+    }
+
+    public Snapshot captureState(String eventName) { return new Snapshot(this); }
+    public void replaceState(@NotNull Snapshot snapshot) {
+        snapshot.model.restore(this.list);
+        this.refreshEntries();
+        this.setFocused(this.getEntry(snapshot.focused));
+        this.setSelected(this.getEntry(snapshot.selected));
+    }
+
+    public record Snapshot(PackList target, @Nullable Pack focused, @Nullable Pack selected, PackListModel.Snapshot model) implements Restorable.Snapshot<Snapshot> {
+        public Snapshot(PackList target) { this(target, extractPack(target.getFocused()), extractPack(target.getSelected()), target.list.captureState()); }
+    }
+
+    private static @Nullable Pack extractPack(@Nullable Entry entry) { return mapOrNull(entry, Entry::pack); }
+
+    // --- CLASE INTERNA ENTRY ---
+    public abstract class Entry extends AbstractFixedListWidget<Entry>.Entry implements ContextMenuContainer {
+        private static final Tooltip FOLDER_OPEN_INFO = Tooltip.create(Component.translatable("pack.folder.open"));
+        protected static final int SPACING = 2;
+        protected static final int BACKGROUND_OFFSET = 1;
+        protected static final ColoredRect SELECTED_OVERLAY = new ColoredRect(Theme.BLUE_500.withAlpha(0.25F));
+        protected final SelectionContext<Pack> context;
+        private final List<GuiEventListener> children = new ObjectArrayList<>();
+        private final List<Renderable> renderables = new ObjectArrayList<>();
+        private final List<Renderable> topRenderables = new ObjectArrayList<>();
+        private final List<NarratableEntry> narratables = new ObjectArrayList<>();
+        private final MouseSelectionHandler<Pack> selectionHandler;
+        protected final PackWidget packWidget;
+        protected FidgetzButton<FolderPack> folderWidget;
+        private boolean stale = false;
+
+        protected Entry(SelectionContext<Pack> context, int index) {
+            super(index);
+            this.context = context;
+            this.selectionHandler = new MouseSelectionHandler<>(this, context);
+            
+            // Iniciar carga del icono
+            PackList.this.assets.getOrLoadIcon(this.pack(), icon -> {});
+
+            this.packWidget = this.addRenderableWidget(new PackWidget(
+                    this.pack(), PackList.this.assets, this.getX(), PackList.this.getRowTop(this.index),
+                    this.getWidth(), PackList.this.itemHeight, SPACING
+            ));
+
+            if (this.pack() instanceof FolderPack folder && (Config.get().isDevMode() || Preferences.INSTANCE.folderPackWidget.get())) {
+                this.folderWidget = this.addTopRenderableOnly(this.prependWidget(
+                        ToggleableHelper.applyPref(Preferences.INSTANCE.folderPackWidget, FidgetzButton.<FolderPack>builder())
+                                .setTooltip(FOLDER_OPEN_INFO).setHeight(this.packWidget.getHeight() / 3).makeSquare()
+                                .setSprite(GuiConstants.HAMBURGER_SPRITE).setMetadata(folder).setOnPress(this::openFolder).build()
+                ));
             }
         }
 
-        int start = this.visibleItems.indexOf(anchor);
-        if (targetIndex != -1 && start != -1) {
-            this.clearSelection();
-            for (int i = Math.min(targetIndex, start); i <= Math.max(targetIndex, start); i++) {
-                T selected = this.visibleItems.get(i);
-                if (selected != targetItem) this.select(selected);
+        public Pack pack() { return this.context.item(); }
+        public boolean isTransferable() { return !PackList.this.options.isLocked() && !this.isStale(); }
+        public boolean isSelected() { return this.context.isSelected(); }
+        public boolean isSelectedLast() { return this.context.isSelectedLast(); }
+
+        public <U extends GuiEventListener & Renderable> U addRenderableWidget(U widget) {
+            this.children.add(widget); this.renderables.add(widget);
+            if (widget instanceof NarratableEntry n) this.narratables.add(n);
+            return widget;
+        }
+
+        public <U extends GuiEventListener> U prependWidget(U widget) {
+            this.children.add(0, widget);
+            if (widget instanceof NarratableEntry n) this.narratables.add(n);
+            return widget;
+        }
+
+        public <U extends Renderable> U addTopRenderableOnly(U renderable) { this.topRenderables.add(renderable); return renderable; }
+
+        public boolean transfer() {
+            if (!this.isSelected() && this.isTransferable()) {
+                PackList.this.sendEvent(new RequestTransferEvent(PackList.this, this.pack()));
+                return true;
             }
-        }
-
-        this.select(targetItem);
-    }
-
-    public List<T> getOrderedSelection() {
-        return this.orderByVisible(this.selectedItems);
-    }
-
-    protected List<T> orderByVisible(List<T> selection) {
-        List<T> orderedSelection = new ObjectArrayList<>(selection);
-        orderedSelection.retainAll(this.visibleItems);
-        orderedSelection.sort(Comparator.comparingInt(this.visibleItems::indexOf));
-        return orderedSelection;
-    }
-
-    public boolean isValidInsertPosition(int index, List<T> selection) {
-        int[] indices = this.getVisibilityIndices(selection);
-        if (indices.length == 0) return false;
-        if (IntsUtil.hasGap(indices)) return true;
-        Arrays.sort(indices);
-
-        int lastSelectionIndex = indices[indices.length - 1];
-        if (!this.items.isEmpty()) {
-            // Cambio: .getLast() -> .get(size - 1)
-            int lastItemIndex = this.items.indexOf(this.items.get(this.items.size() - 1));
-            if (index == -1 && lastItemIndex == lastSelectionIndex) {
-                return false;
+            List<Pack> payload = new ArrayList<>();
+            List<Pack> ordered = PackList.this.getOrderedSelection();
+            for (int i = ordered.size() - 1; i >= 0; i--) {
+                if (PackList.this.isTransferable(ordered.get(i))) payload.add(ordered.get(i));
             }
+            if (!payload.isEmpty()) {
+                PackList.this.sendEvent(new RequestTransferEvent(PackList.this, this.isTransferable() ? this.pack() : null, payload));
+                return true;
+            }
+            return false;
         }
 
-        return index != indices[0] && index - 1 != lastSelectionIndex;
-    }
-
-    private int[] getVisibilityIndices(List<T> selection) {
-        int[] selectionIndices = new int[selection.size()];
-        for (int i = 0; i < selection.size(); i++) {
-            int index = this.visibleItems.indexOf(selection.get(i));
-            selectionIndices[i] = index;
+        protected boolean handleMouseAction(MouseSelectionHandler.Action action) {
+            if (!action.shouldDispatch() || this.isStale()) return false;
+            switch (action) {
+                case SELECT -> PackList.this.select(this.pack());
+                case SELECT_TOGGLE -> PackList.this.selectToggle(this.pack());
+                case SELECT_EXCLUSIVE -> PackList.this.selectExclusive(this.pack());
+                case SELECT_RANGE -> PackList.this.selectRange(this.pack());
+                case TRANSFER -> this.transfer();
+                case DRAG -> {
+                    List<Pack> sel = new ArrayList<>(PackList.this.getOrderedSelection());
+                    Collections.reverse(sel);
+                    PackList.this.sendEvent(new DragEvent(PackList.this, sel, this.pack()));
+                }
+            }
+            if (action.shouldSelect()) PackList.this.sendEvent(new SelectionEvent(PackList.this));
+            return true;
         }
-        return selectionIndices;
-    }
 
-    private int[] getSelectionVisibleIndices() {
-        return this.getVisibilityIndices(this.selectedItems);
+        @Override
+        public boolean mouseClicked(double x, double y, int b) {
+            if (super.mouseClicked(x, y, b)) return false;
+            return this.handleMouseAction(this.selectionHandler.mouseClicked(x, y, b));
+        }
+
+        @Override public boolean mouseReleased(double x, double y, int b) { return this.handleMouseAction(this.selectionHandler.mouseReleased(x, y, b)); }
+        @Override public boolean mouseDragged(double x, double y, int b, double dx, double dy) { return this.handleMouseAction(this.selectionHandler.mouseDragged(x, y, b, dx, dy)); }
+
+        @Override
+        public void render(GuiGraphics g, int i, int t, int l, int w, int h, int mx, int my, boolean hover, float pt) {
+            if (!this.pack().getCompatibility().isCompatible() && !PackList.this.options.getUserConfig().isIncompatibleWarningsHidden()) {
+                g.fill(this.getX() + BACKGROUND_OFFSET, this.getY(), this.getX() + this.getWidth() - BACKGROUND_OFFSET, this.getBottom(), Theme.RED_900.getARGB());
+            }
+            super.render(g, i, t, l, w, h, mx, my, hover, pt);
+            if (this.isSelected()) {
+                pick(isSelectedLast(), GuiConstants.WHITE_OVERLAY, SELECTED_OVERLAY).render(g, this.getX() + BACKGROUND_OFFSET, this.getY(), this.getWidth() - BACKGROUND_OFFSET * 2, this.getHeight());
+            }
+            if (this.isSelected() || this.isFocused()) {
+                if (!this.isFocused()) g.renderOutline(l, this.getY() - BACKGROUND_OFFSET, w, h + BACKGROUND_OFFSET * 2, Theme.BLUE_500.getARGB());
+            }
+            this.renderForeground(g, t, l, w, h, mx, my, hover, pt);
+            if (this.folderWidget != null) this.folderWidget.setPosition(this.packWidget.getContentLeft(), this.getBottom() - this.folderWidget.getHeight() - BACKGROUND_OFFSET);
+            for (Renderable r : this.topRenderables) r.render(g, mx, my, pt);
+        }
+
+        protected abstract void renderForeground(GuiGraphics g, int t, int l, int w, int h, int mx, int my, boolean hover, float pt);
+        @Override public List<? extends GuiEventListener> children() { return this.children; }
+        @Override public List<? extends NarratableEntry> narratables() { return this.narratables; }
+        public boolean isStale() { return this.stale; }
     }
 }
