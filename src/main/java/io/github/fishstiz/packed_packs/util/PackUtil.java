@@ -12,14 +12,10 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.ChatFormatting;
 import net.minecraft.Util;
-import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.packs.PackLocationInfo;
 import net.minecraft.server.packs.PackResources;
 import net.minecraft.server.packs.repository.Pack;
-import net.minecraft.server.packs.repository.PackDetector;
 import net.minecraft.server.packs.repository.PackSource;
-import net.minecraft.world.level.validation.ForbiddenSymlinkInfo;
 
 import java.io.File;
 import java.io.IOException;
@@ -32,16 +28,16 @@ public class PackUtil {
     public static final String FABRIC_ID = "fabric";
     public static final String ZIP_PACK_EXTENSION = ".zip";
     public static final String ICON_FILENAME = "pack.png";
+    
+    // En 1.20.1 PackSource.create recibe el componente directamente
     public static final PackSource PACK_SOURCE = PackSource.create(name ->
             Component.translatable("pack.nameAndSource", name, ResourceUtil.getModName().withStyle(ChatFormatting.YELLOW))
                     .withStyle(ChatFormatting.GRAY), false);
 
-    // Changing these fields would be breaking changes
     private static final String FILE_PREFIX = "file/";
     private static final String DELIMITER = "/";
 
-    private PackUtil() {
-    }
+    private PackUtil() {}
 
     public static String fileName(Path path) {
         return path.getFileName().toString();
@@ -63,15 +59,9 @@ public class PackUtil {
         return FILE_PREFIX + generatePackName(path.getParent()) + DELIMITER + generatePackName(path);
     }
 
-    public static PackLocationInfo replicateLocationInfo(PackLocationInfo info, String id) {
-        return new PackLocationInfo(id, info.title(), info.source(), info.knownPackInfo());
-    }
-
     public static long getLastUpdatedEpochMs(Pack pack) {
         Path path = ((FilePack) pack).packed_packs$getPath();
-        if (path == null) {
-            return -1;
-        }
+        if (path == null) return -1;
 
         try {
             return Files.getLastModifiedTime(path).toInstant().toEpochMilli();
@@ -90,7 +80,7 @@ public class PackUtil {
     }
 
     public static boolean hasMcmeta(Path path) {
-        return Files.isRegularFile(path.resolve(PackResources.PACK_META), LinkOption.NOFOLLOW_LINKS);
+        return Files.isRegularFile(path.resolve("pack.mcmeta"), LinkOption.NOFOLLOW_LINKS);
     }
 
     public static boolean hasFolderConfig(Path path) {
@@ -98,8 +88,8 @@ public class PackUtil {
     }
 
     public static boolean isBuiltIn(Pack pack) {
-        PackSource packSource = pack.getPackSource();
-        return packSource == PackSource.BUILT_IN || Services.PLATFORM.isBuiltInPack(pack);
+        // En 1.20.1 comparamos con constantes de PackSource
+        return pack.getPackSource() == PackSource.BUILT_IN || Services.PLATFORM.isBuiltInPack(pack);
     }
 
     public static boolean isEssential(Pack pack) {
@@ -107,6 +97,7 @@ public class PackUtil {
     }
 
     public static boolean isFeature(Pack pack) {
+        // Feature packs suelen ser de posicion fija o marcados específicamente
         return pack.getPackSource() == PackSource.FEATURE;
     }
 
@@ -132,13 +123,9 @@ public class PackUtil {
     }
 
     public static Path validatePackPath(Pack pack) {
-        if (pack == null) {
-            return null;
-        }
+        if (pack == null) return null;
         Path path = ((FilePack) pack).packed_packs$getPath();
-        if (path == null) {
-            return null;
-        }
+        if (path == null) return null;
 
         try {
             return Files.exists(path) ? path : null;
@@ -150,147 +137,94 @@ public class PackUtil {
 
     public static List<Path> mapValidDirectories(Collection<String> paths) {
         if (paths == null || paths.isEmpty()) return Collections.emptyList();
-
         List<Path> validPaths = new ObjectArrayList<>(paths.size());
         for (String path : paths) {
             if (path == null || path.isBlank()) continue;
-
             try {
                 Path resolved = Paths.get(path);
                 if (Files.isDirectory(resolved, LinkOption.NOFOLLOW_LINKS)) {
                     validPaths.add(resolved.toAbsolutePath().normalize());
-                } else {
-                    PackedPacks.LOGGER.error("[packed_packs] Path is not a valid directory: '{}', ignoring.", path);
                 }
             } catch (Exception e) {
-                PackedPacks.LOGGER.error("[packed_packs] Failed to resolve path: '{}', ignoring.", path, e);
+                PackedPacks.LOGGER.error("[packed_packs] Failed to resolve path: '{}'", path);
             }
         }
-
         return validPaths;
     }
 
     public static void openPack(Pack pack) {
-        var path = ((FilePack) pack).packed_packs$getPath();
-        if (path != null) {
-            Util.getPlatform().openPath(path);
-        }
-    }
-
-    public static void openParent(Pack pack) {
-        var path = ((FilePack) pack).packed_packs$getPath();
-        if (path != null) {
-            PackUtil.openParent(path);
-        }
+        Path path = ((FilePack) pack).packed_packs$getPath();
+        if (path != null) Util.getPlatform().openPath(path.toFile());
     }
 
     public static void openParent(Path path) {
         File file = path.toFile();
         if (!file.exists()) return;
-
-        try {
-            switch (Util.getPlatform()) {
-                case WINDOWS -> new ProcessBuilder("explorer.exe", "/select,", file.getAbsolutePath()).start();
-                case OSX -> new ProcessBuilder("open", "-R", file.getAbsolutePath()).start();
-                case LINUX -> {
-                    File parentFile = file.getParentFile();
-                    if (parentFile != null) new ProcessBuilder("xdg-open", parentFile.getAbsolutePath()).start();
-                }
-                default -> {
-                    Path parent = path.getParent();
-                    if (parent != null) Util.getPlatform().openPath(parent);
-                }
-            }
-        } catch (IOException e) {
-            Path parent = path.getParent();
-            if (parent != null) Util.getPlatform().openPath(parent);
-        }
+        Util.getPlatform().openFile(file.getParentFile());
     }
 
     public static boolean deletePath(Path path) {
         FileUtils fileUtils = FileUtils.getInstance();
-
         if (fileUtils.hasTrash()) {
             try {
                 fileUtils.moveToTrash(path.toFile());
                 return true;
             } catch (IOException e) {
-                PackedPacks.LOGGER.warn("[packed_packs] Failed to move to trash: '{}'", path, e);
+                PackedPacks.LOGGER.warn("Failed to move to trash: '{}'", path, e);
             }
         }
-
-        if (Files.isDirectory(path)) {
-            try {
+        // Fallback a borrado normal
+        try {
+            if (Files.isDirectory(path)) {
                 org.apache.commons.io.FileUtils.deleteDirectory(path.toFile());
-                return true;
-            } catch (IOException e) {
-                PackedPacks.LOGGER.error("[packed_packs] Failed to delete path: '{}'", path, e);
-                return false;
+            } else {
+                Files.deleteIfExists(path);
             }
+            return true;
+        } catch (IOException e) {
+            return false;
         }
-
-        return UtilAccess.packed_packs$createDeleter(path).getAsBoolean();
     }
 
     public static boolean renamePath(Path path, Path newName) {
-        return UtilAccess.packed_packs$createRenamer(path, newName).getAsBoolean();
+        try {
+            Files.move(path, newName);
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
     }
 
-    public static PathValidationResults validatePaths(List<Path> packs) {
-        PackDetector<Path> packDetector = new PackDetector<>(Minecraft.getInstance().directoryValidator()) {
-            @Override
-            protected Path createZipPack(Path path) {
-                return path;
-            }
-
-            @Override
-            protected Path createDirectoryPack(Path path) {
-                return path;
-            }
-        };
-
-        PathValidationResults results = new PathValidationResults(packs);
-        for (Path path : packs) {
-            try {
-                if (!isNonPackDirectory(path)) {
-                    if (validatePath(path, packDetector, results.symlinkWarnings)) {
-                        results.addValid(path);
-                    }
-                    continue;
-                }
-
-                try (DirectoryStream<Path> paths = Files.newDirectoryStream(path)) {
-                    for (Path child : paths) {
-                        if (validatePath(child, packDetector, results.symlinkWarnings)) {
-                            results.addValid(path);
-                            break;
+    // El sistema de validación ha sido simplificado para 1.20.1 (sin DirectoryValidator ni PackDetector)
+    public static PathValidationResults validatePaths(List<Path> paths) {
+        PathValidationResults results = new PathValidationResults(paths);
+        for (Path path : paths) {
+            if (Files.exists(path)) {
+                if (hasMcmeta(path) || path.toString().endsWith(ZIP_PACK_EXTENSION)) {
+                    results.addValid(path);
+                } else if (Files.isDirectory(path)) {
+                    // Si es un directorio sin mcmeta, miramos dentro
+                    try (DirectoryStream<Path> stream = Files.newDirectoryStream(path)) {
+                        for (Path child : stream) {
+                            if (hasMcmeta(child) || child.toString().endsWith(ZIP_PACK_EXTENSION)) {
+                                results.addValid(path);
+                                break;
+                            }
                         }
-                    }
+                    } catch (IOException ignored) {}
                 }
-            } catch (IOException e) {
-                PackedPacks.LOGGER.warn("Failed to check {} for packs", path, e);
             }
         }
-
         return results;
     }
 
-    private static boolean validatePath(Path path, PackDetector<Path> packDetector, List<ForbiddenSymlinkInfo> symlinkWarnings) throws IOException {
-        Path detectedPack = packDetector.detectPackResources(path, symlinkWarnings);
-        if (detectedPack == null) {
-            PackedPacks.LOGGER.warn("Path {} does not seem like pack", path);
-            return false;
-        }
-        return true;
-    }
+    public static class PathValidationResults {
+        public final List<Path> valid;
+        public final Set<Path> rejected;
 
-    public record PathValidationResults(
-            List<Path> valid,
-            Set<Path> rejected,
-            List<ForbiddenSymlinkInfo> symlinkWarnings
-    ) {
-        private PathValidationResults(Collection<Path> packs) {
-            this(new ArrayList<>(packs.size()), new ObjectOpenHashSet<>(packs), new ArrayList<>());
+        public PathValidationResults(Collection<Path> packs) {
+            this.valid = new ArrayList<>();
+            this.rejected = new ObjectOpenHashSet<>(packs);
         }
 
         private void addValid(Path path) {
