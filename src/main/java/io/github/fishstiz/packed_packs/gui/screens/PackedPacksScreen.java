@@ -695,33 +695,39 @@ public class PackedPacksScreen extends PackListEventHandler implements
     }
 
     @Override
-    public void onEvent(PackListEvent event) {
-        super.onEvent(event);
+public void onEvent(PackListEvent event) {
+    super.onEvent(event);
 
-        this.profiles.getSidebar().setOpen(false);
-        this.contextMenu.setOpen(false);
-        this.fileRenameModal.setOpen(false);
-        ObjectsUtil.ifPresent(this.aliasModal, Modal::closeModal);
+    this.profiles.getSidebar().setOpen(false);
+    this.contextMenu.setOpen(false);
+    this.fileRenameModal.setOpen(false);
+    if (this.aliasModal != null) this.aliasModal.closeModal();
 
-        boolean notFolderDialogEvent = event.target() != this.folderDialog.root();
-        if (notFolderDialogEvent) this.folderDialog.setOpen(false);
+    boolean notFolderDialogEvent = event.target() != this.folderDialog.root();
+    if (notFolderDialogEvent) this.folderDialog.setOpen(false);
 
-        switch (event) {
-            case FileDeleteEvent ignore -> this.revalidatePacks();
-            case FileRenameOpenEvent(PackList target, Pack trigger) -> this.fileRenameModal.open(target, trigger);
-            case FileRenameEvent e -> this.onFileRename(e);
-            case FileRenameCloseEvent e -> this.focusList(e.target());
-            case FolderOpenEvent e -> this.onFolderOpen(e);
-            case FolderCloseEvent e -> this.onFolderClose(e);
-            case PackAliasOpenEvent e -> this.onOpenAliases(e);
-            default -> {
-            }
-        }
-
-        if (this.isUnlocked() && event.pushToHistory() && notFolderDialogEvent) {
-            this.history.push(this.captureState());
-        }
+    // REESCRITO PARA JAVA 17
+    if (event instanceof FileDeleteEvent) {
+        this.revalidatePacks();
+    } else if (event instanceof FileRenameOpenEvent) {
+        FileRenameOpenEvent e = (FileRenameOpenEvent) event;
+        this.fileRenameModal.open(e.target(), e.trigger());
+    } else if (event instanceof FileRenameEvent) {
+        this.onFileRename((FileRenameEvent) event);
+    } else if (event instanceof FileRenameCloseEvent) {
+        this.focusList(((FileRenameCloseEvent) event).target());
+    } else if (event instanceof FolderOpenEvent) {
+        this.onFolderOpen((FolderOpenEvent) event);
+    } else if (event instanceof FolderCloseEvent) {
+        this.onFolderClose((FolderCloseEvent) event);
+    } else if (event instanceof PackAliasOpenEvent) {
+        this.onOpenAliases((PackAliasOpenEvent) event);
     }
+
+    if (this.isUnlocked() && event.pushToHistory() && notFolderDialogEvent) {
+        this.history.push(this.captureState());
+    }
+}
 
     @Override
     public ScreenContext ctx() {
