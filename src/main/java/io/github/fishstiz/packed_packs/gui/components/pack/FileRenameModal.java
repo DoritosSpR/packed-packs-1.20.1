@@ -243,13 +243,15 @@ public class FileRenameModal extends Modal<LinearLayout> {
 
     @Override
     public @Nullable ComponentPath nextFocusPath(FocusNavigationEvent event) {
-        if (this.nameEditor.isFocused() &&
-            event instanceof FocusNavigationEvent.ArrowNavigation(ScreenDirection direction) &&
-            direction.getAxis() == ScreenAxis.HORIZONTAL) {
-            if (!Screen.hasShiftDown()) {
-                this.nameEditor.setHighlightPos(this.nameEditor.getCursorPosition());
+        // REESCRITO PARA JAVA 17
+        if (this.nameEditor.isFocused() && event instanceof FocusNavigationEvent.ArrowNavigation) {
+            FocusNavigationEvent.ArrowNavigation arrowNav = (FocusNavigationEvent.ArrowNavigation) event;
+            if (arrowNav.direction().getAxis() == ScreenAxis.HORIZONTAL) {
+                if (!Screen.hasShiftDown()) {
+                    this.nameEditor.setHighlightPos(this.nameEditor.getCursorPosition());
+                }
+                return ComponentPath.path(this.nameEditor, this);
             }
-            return ComponentPath.path(this.nameEditor, this);
         }
 
         return super.nextFocusPath(event);
