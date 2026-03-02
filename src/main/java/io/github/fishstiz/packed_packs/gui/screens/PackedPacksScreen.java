@@ -48,7 +48,7 @@ import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.layouts.LayoutElement;
 import net.minecraft.client.gui.screens.AlertScreen;
 import net.minecraft.client.gui.screens.ConfirmScreen;
-import net.minecraft.client.gui.screens.NoticeWithLinkScreen;
+import net.minecraft.client.gui.screens.ConfirmLinkScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.packs.PackSelectionScreen;
 import net.minecraft.network.chat.CommonComponents;
@@ -402,7 +402,13 @@ public class PackedPacksScreen extends PackListEventHandler implements
             PathValidationResults results = validatePaths(packs);
 
             if (!results.symlinkWarnings().isEmpty()) {
-                this.minecraft.setScreen(NoticeWithLinkScreen.createPackSymlinkWarningScreen(() -> this.minecraft.setScreen(this)));
+                // Adaptado para 1.20.1: Usamos ConfirmLinkScreen como alternativa a NoticeWithLinkScreen
+                this.minecraft.setScreen(new ConfirmLinkScreen(
+                    (accept) -> this.minecraft.setScreen(this),
+                    "https://www.minecraft.net/rules/symlinks", // Enlace oficial de advertencia
+                    Component.translatable("pack.dropRejected.symlink"), 
+                    true
+                ));
                 return;
             }
             if (!results.valid().isEmpty()) {
@@ -441,7 +447,7 @@ public class PackedPacksScreen extends PackListEventHandler implements
         }
 
         if (this.original.packType() == PackType.SERVER_DATA && !(this.previous instanceof PackSelectionScreen)) {
-            this.original.output().accept(this.repository.getRepository()); // validate datapacks
+            this.original.output().accept(this.repository.getRepository()); 
             return;
         }
 
@@ -695,39 +701,49 @@ public class PackedPacksScreen extends PackListEventHandler implements
     }
 
     @Override
-public void onEvent(PackListEvent event) {
-    super.onEvent(event);
+    public void onEvent(PackListEvent event) {
+        super.onEvent(event);
 
-    this.profiles.getSidebar().setOpen(false);
-    this.contextMenu.setOpen(false);
-    this.fileRenameModal.setOpen(false);
-    if (this.aliasModal != null) this.aliasModal.closeModal();
+        this.profiles.getSidebar().setOpen(false);
+        this.contextMenu.setOpen(false);
+        this.fileRenameModal.setOpen(false);
+        if (this.aliasModal != null) this.aliasModal.closeModal();
 
-    boolean notFolderDialogEvent = event.target() != this.folderDialog.root();
-    if (notFolderDialogEvent) this.folderDialog.setOpen(false);
+        boolean notFolderDialogEvent = event.target() != this.folderDialog.root();
+        if (notFolderDialogEvent) this.folderDialog.setOpen(false);
 
-    // REESCRITO PARA JAVA 17
-    if (event instanceof FileDeleteEvent) {
-        this.revalidatePacks();
-    } else if (event instanceof FileRenameOpenEvent) {
-        FileRenameOpenEvent e = (FileRenameOpenEvent) event;
-        this.fileRenameModal.open(e.target(), e.trigger());
-    } else if (event instanceof FileRenameEvent) {
-        this.onFileRename((FileRenameEvent) event);
-    } else if (event instanceof FileRenameCloseEvent) {
-        this.focusList(((FileRenameCloseEvent) event).target());
-    } else if (event instanceof FolderOpenEvent) {
-        this.onFolderOpen((FolderOpenEvent) event);
-    } else if (event instanceof FolderCloseEvent) {
-        this.onFolderClose((FolderCloseEvent) event);
-    } else if (event instanceof PackAliasOpenEvent) {
-        this.onOpenAliases((PackAliasOpenEvent) event);
+        if (event instanceof FileDeleteEvent) {
+            this.revalidatePacks();
+        } else if (event instanceof FileRenameOpenEvent) {
+            FileRenameOpenEvent e = (FileRenameOpenEvent) event;
+            this.fileRenameModal.open(e.target(), e.trigger());
+        } else if (event instanceof FileRenameEvent) {
+            this.onFileRename((FileRenameEvent) event);
+        } else if (event instanceof FileRenameCloseEvent) {
+            this.focusList(((FileRenameCloseEvent) event).target());
+        } else if (event instanceof FolderOpenEvent) {
+            this.onFolderOpen((FolderOpenEvent) event);
+        } else if (event instanceof FolderCloseEvent) {
+            this.onFolderClose((FolderCloseEvent) event);
+        } else if (event instanceof PackAliasOpenEvent) {
+            this.onOpenAliases((PackAliasOpenEvent) event);
+        }
+
+        if (this.isUnlocked() && event.pushToHistory() && notFolderDialogEvent) {
+            this.history.push(this.captureState());
+        }
     }
 
-    if (this.isUnlocked() && event.pushToHistory() && notFolderDialogEvent) {
-        this.history.push(this.captureState());
+    @Override
+    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        super.render(guiGraphics, mouseX, mouseY, partialTick);
+        this.layout.render(guiGraphics, mouseX, mouseY, partialTick);
+        
+        // Renderizado de diálogos en orden inverso
+        for (int i = this.dialogs.size() - 1; i >= 0; i--) {
+            this.dialogs.get(i).render(guiGraphics, mouseX, mouseY, partialTick);
+        }
     }
-}
 
     @Override
     public ScreenContext ctx() {
@@ -762,216 +778,6 @@ public void onEvent(PackListEvent event) {
         if (CollectionsUtil.anyMatch(this.dialogs, ToggleableDialog::isOpen)) {
             return false;
         }
-        if (codePoint != KEY_SPACE && noModifiers(modifiers)) {
-            PackLayout packLayout = this.getLayoutFromSelectedList();
-            if (packLayout != null && !packLayout.getSearchField().isFocused()) {
-                return this.focusSearchField(packLayout).charTyped(codePoint, modifiers);
-            }
-        }
         return false;
-    }
-
-    public void toggleDevMode() {
-        Config.get().setDevMode(!Config.get().isDevMode());
-        ToastUtil.onDevModeToggleToast(Config.get().isDevMode());
-        this.rebuildWidgets();
-    }
-
-    public void switchDefaultProfile() {
-        this.options.getDefaultProfile().ifPresent(profile -> {
-            if (Objects.equals(this.profiles.getProfile(), profile)) {
-                this.profiles.setProfile(null);
-            } else {
-                this.profiles.setProfile(profile);
-            }
-        });
-    }
-
-    @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        this.contextMenu.setOpen(false);
-
-        if (isDeveloperMode(keyCode, modifiers)) {
-            this.toggleDevMode();
-            return true;
-        }
-        if (isSwitchDefaultProfile(keyCode, modifiers)) {
-            this.switchDefaultProfile();
-            return true;
-        }
-        if (isRefresh(keyCode, modifiers) && (this.refreshFuture == null || this.refreshFuture.isDone())) {
-            this.refreshPacks();
-            return true;
-        }
-        if (isOpenProfiles(keyCode, modifiers)) {
-            this.profiles.getSidebar().toggle();
-            return true;
-        }
-        if (super.keyPressed(keyCode, scanCode, modifiers)) {
-            return true;
-        }
-        if (isRedo(keyCode, modifiers) && this.isUnlocked()) {
-            return this.history.redo();
-        }
-        if (isUndo(keyCode, modifiers) && this.isUnlocked()) {
-            return this.history.undo();
-        }
-        if (isSelectAll(keyCode)) {
-            PackLayout packLayout = this.getLayoutFromSelectedList();
-            if (packLayout != null) {
-                packLayout.list().selectAll();
-                this.onEvent(new SelectionEvent(packLayout.list()));
-                return true;
-            }
-        }
-        if (keyCode == KEY_BACKSPACE) {
-            PackLayout packLayout = this.getLayoutFromSelectedList();
-            if (packLayout != null) {
-                ToggleableEditBox<Void> searchField = packLayout.getSearchField();
-                if (!searchField.isFocused() && !searchField.getValue().isEmpty()) {
-                    return this.focusSearchField(packLayout).keyPressed(keyCode, scanCode, modifiers);
-                }
-            }
-        }
-        return false;
-    }
-
-    private boolean hasHeader(List<MenuItem> items) {
-        return !items.isEmpty() && items.getFirst() instanceof PackMenuHeader;
-    }
-
-    private void openContextMenu(int mouseX, int mouseY) {
-        if (this.contextMenu.isMouseOver(mouseX, mouseY)) return;
-
-        Map<ScreenEvent.OpenCtxMenu.Phase, ContextMenuItemBuilder> builders = new EnumMap<>(ScreenEvent.OpenCtxMenu.Phase.class);
-        this.postApiEvent(new ScreenEvent.OpenCtxMenu(this.context, phase -> builders.computeIfAbsent(phase, p -> new ContextMenuItemBuilder())));
-
-        this.buildItems(mouseX, mouseY)
-                .whenNonNull(builders.get(ScreenEvent.OpenCtxMenu.Phase.BEFORE_ALL))
-                .ifTrue((extraBuilder, b) -> b.addAll(extraBuilder.build()))
-                .when(Config.get().isDevMode())
-                .ifTrue(dev -> dev.separatorIfNonEmpty()
-                        .whenNonNull(this.profiles.getProfile())
-                        .ifTrue((profile, b) -> b.
-                                add(devItem(ResourceUtil.getText("profile.save"))
-                                        .action(() -> profile.setPacks(this.currentPacks.list().copyPacks()))
-                                        .build())
-                                .separator())
-                        .parent(children -> devItem(ResourceUtil.getText("preferences"))
-                                .addChildren(children)
-                                .build(), builder -> builder
-                                .addAll(ToggleableHelper.preferences())
-                                .whenNonNull(builders.get(ScreenEvent.OpenCtxMenu.Phase.PREFERENCES))
-                                .ifTrue((extraBuilder, b) -> b.addAll(extraBuilder.build()))
-                                .add(devItem(ResourceUtil.getText("preferences.reset"))
-                                        .action(Preferences.INSTANCE::reset)
-                                        .build()))
-                )
-                .separatorIfNonEmpty()
-                .simpleItem(ResourceUtil.getText("reset_enabled"), this::isUnlocked, this::useSelected)
-                .simpleItem(ResourceUtil.getText("refresh"), this::canRefresh, this::refreshPacks)
-                .when(this.additionalFolders, List::isEmpty)
-                .ifTrue(b -> b.simpleItem(OPEN_FOLDER_TEXT, this.repository::openDir))
-                .orElse((dirs, b) -> b
-                        .parent(OPEN_FOLDER_TEXT, p -> p
-                                .add(new DirectoryMenuItem(this.repository.getBaseDir()))
-                                .separator()
-                                .iterate(dirs)
-                                .map(DirectoryMenuItem::new)))
-                .whenNonNull(builders.get(ScreenEvent.OpenCtxMenu.Phase.AFTER_ALL))
-                .ifTrue((extraBuilder, b) -> b.addAll(extraBuilder.build()))
-                .peek(items -> {
-                    int yOffset = this.hasHeader(items) ? this.contextMenu.getItemHeight() : 0;
-                    this.contextMenu.open(mouseX, mouseY - yOffset, items);
-                });
-    }
-
-    @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        this.setDragged(null);
-        if (isRightClick(button) && !this.optionsModal.isMouseOver(mouseX, mouseY)) {
-            this.openContextMenu((int) mouseX, (int) mouseY);
-            return true;
-        }
-        if (super.mouseClicked(mouseX, mouseY, button)) {
-            return true;
-        }
-        if (isClickForward(button) && this.isUnlocked()) {
-            return this.history.redo();
-        }
-        if (isClickBack(button) && this.isUnlocked()) {
-            return this.history.undo();
-        }
-        if (isLeftClick(button) && !(this.getFocused() instanceof PackList)) {
-            this.setFocused(this.children().getFirst());
-            this.layout.visitWidgets(w -> w.setFocused(false));
-        }
-        this.contextMenu.setOpen(false);
-        return false;
-    }
-
-    @Override
-    public List<ToggleableDialog<?>> getDialogs() {
-        return this.dialogs;
-    }
-
-    @Override
-    public @Nullable GuiEventListener getHovered() {
-        return this.hoveredElement;
-    }
-
-    @Override
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        this.hoveredElement = this.findHovered(mouseX, mouseY);
-
-        super.render(guiGraphics, mouseX, mouseY, partialTick);
-
-        if (Config.get().isDevMode()) {
-            float scale = 0.5f;
-            int y = (int) ((height - this.font.lineHeight * scale) / scale);
-
-            guiGraphics.pose().pushPose();
-            guiGraphics.pose().scale(scale, scale, 0);
-            guiGraphics.drawString(this.font, ResourceUtil.getText("dev_mode", DEV_MODE_SHORTCUT), 0, y, Theme.WHITE.getARGB());
-            guiGraphics.pose().popPose();
-        }
-    }
-
-    public boolean canRefresh() {
-        return this.refreshFuture == null || this.refreshFuture.isDone();
-    }
-
-    public void clearHistory() {
-        this.history.reset(this.captureState());
-    }
-
-    public void recordState(String eventName) {
-        this.history.push(this.captureState(eventName));
-    }
-
-    @Override
-    public @NotNull Snapshot captureState(String eventName) {
-        return new Snapshot(this, this.availablePacks.list().captureState(), this.currentPacks.list().captureState());
-    }
-
-    @Override
-    public void replaceState(@NotNull Snapshot snapshot) {
-        Set<Pack> validPacks = new ObjectOpenHashSet<>(this.repository.getPacks());
-        Query availablePacksQuery = snapshot.availablePacks.model().query();
-        this.availablePacks.getSortButton().setValueSilently(availablePacksQuery.sort());
-        this.availablePacks.getCompatButton().setValueSilently(availablePacksQuery.hideIncompatible());
-        this.availablePacks.getSearchField().setValueSilently(availablePacksQuery.unmodifiedSearch());
-        this.currentPacks.getSearchField().setValueSilently(snapshot.currentPacks().model().query().unmodifiedSearch());
-        snapshot.availablePacks.retainAll(validPacks).restore();
-        snapshot.currentPacks.retainAll(validPacks).restore();
-        this.availablePacks.list().scrollToLastSelected();
-        this.currentPacks.list().scrollToLastSelected();
-    }
-
-    public record Snapshot(
-            PackedPacksScreen target,
-            PackList.Snapshot availablePacks,
-            PackList.Snapshot currentPacks
-    ) implements Restorable.Snapshot<Snapshot> {
     }
 }
