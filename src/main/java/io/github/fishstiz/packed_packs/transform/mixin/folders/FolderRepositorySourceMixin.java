@@ -23,47 +23,54 @@ public abstract class FolderRepositorySourceMixin {
 
     @Shadow @Final private Path folder;
 
-    @Unique
-    private static final ThreadLocal<Boolean> IS_RECURSIVE_CALL = ThreadLocal.withInitial(() -> false);
-
     /**
      * En 1.20.1, el método es loadPacks(Consumer<Pack> consumer).
-     * Vamos a inyectar nuestra lógica para detectar subcarpetas.
+     * Especificamos la firma completa para evitar errores de mapeo.
      */
-    @Inject(method = "loadPacks", at = @At("HEAD"), cancellable = true)
-    private void detectNestedPacks(Consumer<Pack> consumer, CallbackInfo ci) {
-        // Evitamos bucles infinitos si llamamos a loadPacks recursivamente
-        if (IS_RECURSIVE_CALL.get()) return;
-
+    @Inject(method = "loadPacks(Ljava/util/function/Consumer;)V", at = @At("TAIL"))
+    private void injectNestedPackDetection(Consumer<Pack> consumer, CallbackInfo ci) {
         try {
-            IS_RECURSIVE_CALL.set(true);
             discoverNestedPacks(this.folder, consumer);
         } catch (Exception e) {
-            PackedPacks.LOGGER.error("Failed to load nested packs", e);
-        } finally {
-            IS_RECURSIVE_CALL.set(false);
+            PackedPacks.LOGGER.error("[Packed Packs] Failed to load nested packs from {}", this.folder, e);
         }
     }
 
     @Unique
     private void discoverNestedPacks(Path root, Consumer<Pack> consumer) {
+        if (!Files.isDirectory(root)) return;
+
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(root)) {
             for (Path path : stream) {
+                // Si es un directorio que NO es un pack (no tiene mcmeta), entramos
                 if (PackUtil.isNonPackDirectory(path)) {
-                    // Si es una carpeta sin pack.mcmeta, buscamos dentro (Recursividad de 1 nivel)
                     try (DirectoryStream<Path> subStream = Files.newDirectoryStream(path)) {
                         for (Path subPath : subStream) {
-                            // Aquí llamaríamos a la lógica que crea el Pack
-                            // Para 1.20.1, lo ideal es dejar que el FolderRepositorySource original
-                            // haga su trabajo pero con la ruta modificada.
+                            // Si el sub-archivo/carpeta SI es un pack, lo registramos
+                            if (PackUtil.hasMcmeta(subPath) || subPath.toString().endsWith(".zip")) {
+                                createAndRegisterPack(subPath, consumer, true);
+                            }
                         }
                     }
                 }
             }
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            PackedPacks.LOGGER.error("Error scanning directory: {}", root, e);
+        }
     }
 
-    // Nota: El sistema de 1.21 de "WrapOperation" en PackDetector no funcionará aquí
-    // porque esas clases no existen. La lógica de "anidamiento" debe ser recreada
-    // inyectando en el constructor de Pack.ResourcesSupplier.
+    @Unique
+    private void createAndRegisterPack(Path path, Consumer<Pack> consumer, boolean isNested) {
+        String name = PackUtil.generatePackName(path);
+        String id = isNested ? PackUtil.generateNestedPackId(path) : PackUtil.generatePackId(path);
+
+        // En 1.20.1, el método Pack.readMetaAndCreate es el que FolderRepositorySource usa internamente
+        // pero como es complejo de llamar manualmente con todos los parámetros, 
+        // a menudo se usa una implementación custom o se accede vía Accessor.
+        
+        // NOTA: Para que esto compile, necesitarás un método que cree el objeto Pack.
+        // Como FolderRepositorySource ya tiene la lógica de creación, lo más limpio
+        // suele ser usar un @Invoker para el método privado 'createPack' (si existe en tu versión de Forge)
+        // o construir el Pack manualmente.
+    }
 }
