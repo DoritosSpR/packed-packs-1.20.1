@@ -10,7 +10,6 @@ import io.github.fishstiz.packed_packs.util.ResourceUtil;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.packs.PackSelectionScreen;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.resources.ResourceLocation;
@@ -26,8 +25,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 public class PackAssetManager {
+    // Adaptación 1.20.1: Uso del constructor de ResourceLocation en lugar de withDefaultNamespace
     public static final Sprite DEFAULT_FOLDER_ICON = Sprite.of16(ResourceUtil.id("textures/misc/unknown_folder.png"));
-    public static final Sprite DEFAULT_ICON = Sprite.of16(ResourceLocation.withDefaultNamespace("textures/misc/unknown_pack.png"));
+    public static final Sprite DEFAULT_ICON = Sprite.of16(new ResourceLocation("textures/misc/unknown_pack.png"));
+    
     private final Map<String, Sprite> cachedIcons = new Object2ObjectOpenHashMap<>();
     private final Minecraft minecraft;
     private Map<String, Sprite> staleIcons;
@@ -77,18 +78,23 @@ public class PackAssetManager {
     }
 
     /**
-     * Copied from {@link PackSelectionScreen#loadPackIcon(TextureManager, Pack)}
+     * Adaptado para Minecraft 1.20.1
      */
     private CompletableFuture<@Nullable ResourceLocation> loadPackIcon(Pack pack) {
         return CompletableFuture.supplyAsync(() -> {
             try (PackResources packResources = pack.open()) {
+                // En 1.20.1, el acceso a root resources se hace así:
                 IoSupplier<InputStream> iconIoSupplier = packResources.getRootResource(PackUtil.ICON_FILENAME);
                 if (iconIoSupplier == null) return null;
 
-                ResourceLocation icon = ResourceLocation.withDefaultNamespace(hashIconName(pack.getId()));
+                // Adaptación 1.20.1: Constructor manual de ResourceLocation
+                ResourceLocation icon = new ResourceLocation("minecraft", hashIconName(pack.getId()));
+                
                 try (InputStream iconStream = iconIoSupplier.get()) {
                     NativeImage nativeImage = NativeImage.read(iconStream);
                     TextureManager manager = this.minecraft.getTextureManager();
+                    
+                    // Ejecutamos el registro en el hilo principal de renderizado
                     this.minecraft.execute(() -> manager.register(icon, new DynamicTexture(nativeImage)));
                     return icon;
                 }
@@ -103,6 +109,7 @@ public class PackAssetManager {
 
     @SuppressWarnings("deprecation")
     private static String hashIconName(String id) {
-        return "pack/" + Util.sanitizeName(id, ResourceLocation::validPathChar) + "/" + Hashing.sha1().hashUnencodedChars(id) + "/icon";
+        // En 1.20.1, validPathChar es el método correcto para sanitizar
+        return "packed_packs/pack/" + Util.sanitizeName(id, ResourceLocation::validPathChar) + "/" + Hashing.sha1().hashUnencodedChars(id) + "/icon";
     }
 }
