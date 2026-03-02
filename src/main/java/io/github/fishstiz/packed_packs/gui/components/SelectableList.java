@@ -4,6 +4,7 @@ import com.google.common.primitives.Ints;
 import io.github.fishstiz.packed_packs.util.lang.IntsUtil;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import net.minecraft.util.Mth;
 
 import java.util.*;
 import java.util.function.Predicate;
@@ -88,7 +89,8 @@ public class SelectableList<T> {
         }
 
         this.items.remove(item);
-        this.items.add(Math.clamp(index, 0, this.items.size()), item);
+        // Cambio: Math.clamp (Java 21) -> Mth.clamp (Minecraft/Java 17)
+        this.items.add(Mth.clamp(index, 0, this.items.size()), item);
     }
 
     public boolean move(int index, T item) {
@@ -124,7 +126,8 @@ public class SelectableList<T> {
     }
 
     public T getLastSelected() {
-        return !this.selectedItems.isEmpty() ? this.selectedItems.getLast() : null;
+        // Cambio: .getLast() -> .get(size - 1)
+        return !this.selectedItems.isEmpty() ? this.selectedItems.get(this.selectedItems.size() - 1) : null;
     }
 
     public void clearSelection() {
@@ -194,7 +197,8 @@ public class SelectableList<T> {
 
         int lastSelectionIndex = indices[indices.length - 1];
         if (!this.items.isEmpty()) {
-            int lastItemIndex = this.items.indexOf(this.items.getLast());
+            // Cambio: .getLast() -> .get(size - 1)
+            int lastItemIndex = this.items.indexOf(this.items.get(this.items.size() - 1));
             if (index == -1 && lastItemIndex == lastSelectionIndex) {
                 return false;
             }
