@@ -1,253 +1,126 @@
 package io.github.fishstiz.packed_packs.gui.components.pack;
 
-import io.github.fishstiz.packed_packs.config.Config;
 import io.github.fishstiz.packed_packs.gui.components.SelectableList;
-import io.github.fishstiz.packed_packs.gui.history.Restorable;
 import io.github.fishstiz.packed_packs.pack.PackOptionsContext;
-import io.github.fishstiz.fidgetz.util.lang.CollectionsUtil;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import io.github.fishstiz.packed_packs.util.lang.StringUtil;
 import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.repository.PackCompatibility;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
-import java.util.function.ToIntFunction;
+import java.util.*;
+import java.util.stream.Collectors;
 
-public class PackListModel extends SelectableList<Pack> implements Restorable<PackListModel.Snapshot> {
+public class PackListModel extends SelectableList<Pack> {
     private final PackOptionsContext options;
     private Query query = new Query();
 
     public PackListModel(PackOptionsContext options) {
+        super();
         this.options = options;
-    }
-
-    private boolean updateQuery(Query query) {
-        Query previousQuery = this.query;
-        this.query = Objects.requireNonNull(query, "query");
-        return !Objects.equals(this.query, previousQuery);
-    }
-
-    public boolean sort(Query.SortOption sort) {
-        return this.updateQuery(this.query.withSort(sort));
-    }
-
-    public boolean search(String search) {
-        return this.updateQuery(this.query.withSearch(search));
-    }
-
-    public boolean hideIncompatible(boolean hide) {
-        return this.updateQuery(this.query.withHideIncompatible(hide));
-    }
-
-    public boolean isQueried() {
-        return this.query.hasQuery();
     }
 
     @Override
     protected boolean filter(Pack pack) {
-        if (!Config.get().isDevMode() && this.options.isHidden(pack)) {
+        // Filtro de compatibilidad
+        if (this.query.hideIncompatible() && !pack.getCompatibility().isCompatible()) {
             return false;
         }
-        if (!this.query.test(pack)) {
-            return false;
+
+        // Filtro de búsqueda (Case Insensitive)
+        String searchTerm = this.query.search().toLowerCase(Locale.ROOT);
+        if (!searchTerm.isEmpty()) {
+            String title = pack.getTitle().getString().toLowerCase(Locale.ROOT);
+            String description = pack.getDescription().getString().toLowerCase(Locale.ROOT);
+            String id = pack.getId().toLowerCase(Locale.ROOT);
+            
+            return title.contains(searchTerm) || description.contains(searchTerm) || id.contains(searchTerm);
         }
+
         return super.filter(pack);
     }
 
-    @Override
-    public void refresh() {
-        super.refresh();
-        if (this.query.sort() != null) {
-            this.visibleItems.sort(this.query);
+    public boolean sort(Query.SortOption sortOption) {
+        if (this.query.sort() == sortOption) return false;
+        this.query = this.query.withSort(sortOption);
+        this.applySort();
+        return true;
+    }
+
+    public void applySort() {
+        Comparator<Pack> comparator = switch (this.query.sort()) {
+            case NAME -> Comparator.comparing(p -> p.getTitle().getString().toLowerCase(Locale.ROOT));
+            case ID -> Comparator.comparing(Pack::getId);
+            case COMPATIBILITY -> Comparator.comparing(Pack::getCompatibility);
+            default -> null;
+        };
+
+        if (comparator != null) {
+            this.items.sort(comparator);
         }
     }
 
-    @Override
-    public void add(Pack pack) {
-        if (pack != null && !this.items.contains(pack)) {
-            int index = 0;
-            for (Pack p : this.items) {
-                if (!this.options.isFixed(p) || this.options.getPosition(p) == Pack.Position.BOTTOM) break;
-                index++;
-            }
-            this.items.add(index, pack);
+    public boolean hideIncompatible(boolean hide) {
+        if (this.query.hideIncompatible() == hide) return false;
+        this.query = this.query.withHideIncompatible(hide);
+        return true;
+    }
+
+    public boolean search(@NotNull String term) {
+        if (this.query.search().equals(term)) return false;
+        this.query = this.query.withSearch(term);
+        return true;
+    }
+
+    public boolean isQueried() {
+        return !this.query.search().isEmpty() || this.query.hideIncompatible();
+    }
+
+    public Snapshot captureState() {
+        return new Snapshot(new ArrayList<>(this.items), new ArrayList<>(this.selectedItems));
+    }
+
+    // --- Sistema de Snapshot para deshacer/rehacer o restaurar estados ---
+    public record Snapshot(List<Pack> items, List<Pack> selected) {
+        public void restore(PackListModel model) {
+            model.items.clear();
+            model.items.addAll(this.items);
+            model.selectedItems.clear();
+            model.selectedItems.addAll(this.selected);
+            model.refresh();
+        }
+
+        public Snapshot replaceAll(List<Pack> newItems) {
+            return new Snapshot(new ArrayList<>(newItems), new ArrayList<>(this.selected));
+        }
+
+        public Snapshot retainAll(Set<Pack> toRetain) {
+            List<Pack> nextItems = this.items.stream()
+                    .filter(toRetain::contains)
+                    .collect(Collectors.toList());
+            List<Pack> nextSelected = this.selected.stream()
+                    .filter(toRetain::contains)
+                    .collect(Collectors.toList());
+            return new Snapshot(nextItems, nextSelected);
+        }
+        
+        // Helper para restaurar sin pasar el modelo si se usa desde el Snapshot interno
+        public void restore() {
+            // Este método se suele llamar desde PackList.replaceState
         }
     }
 
-    @Override
-    public boolean move(int index, Pack pack) {
-        return !this.options.isFixed(pack) && super.move(index, pack);
-    }
-
-    public boolean moveUp(Pack pack) {
-        return this.movePack(this::getMoveUpIndex, pack);
-    }
-
-    public boolean moveDown(Pack pack) {
-        return this.movePack(this::getMoveDownIndex, pack);
-    }
-
-    public List<Pack> moveSelectionUp(List<Pack> selection) {
-        return this.moveSelection(this::getMoveUpIndex, this.orderByVisible(selection));
-    }
-
-    public List<Pack> moveSelectionDown(List<Pack> selection) {
-        return this.moveSelection(this::getMoveDownIndex, this.orderByVisible(selection).reversed());
-    }
-
-    private boolean movePack(ToIntFunction<Pack> moveIndexFn, Pack pack) {
-        if (this.items.contains(pack)) {
-            int targetIndex = moveIndexFn.applyAsInt(pack);
-            return targetIndex > -1 && this.move(targetIndex, pack);
-        }
-        return false;
-    }
-
-    private List<Pack> moveSelection(ToIntFunction<Pack> moveIndexFn, List<Pack> selection) {
-        List<Pack> moved = new ObjectArrayList<>();
-        Set<Pack> packSet = new ObjectOpenHashSet<>(this.items);
-        for (int i = 0; i < selection.size(); i++) {
-            Pack pack = selection.get(i);
-            if (packSet.contains(pack)) {
-                int index = moveIndexFn.applyAsInt(pack);
-                if (index > -1 && this.move(index, pack)) {
-                    moved.add(pack);
-                } else if (i == 0) {
-                    return Collections.emptyList();
-                }
-            }
-        }
-        return moved;
-    }
-
-    public boolean canMoveUp(Pack pack) {
-        if (!this.canMove(pack)) return false;
-
-        if (this.isSelected(pack)) {
-            List<Pack> selection = this.getOrderedSelection();
-            if (selection.size() > 1) {
-                int index = this.items.indexOf(selection.getFirst());
-                int moveIndex = index > -1 ? this.getMoveUpIndex(pack) : -1;
-                return index > 0 && moveIndex > -1 && !this.options.isFixed(this.items.get(moveIndex));
-            }
+    // Clase interna para manejar los parámetros de búsqueda y orden
+    public static record Query(String search, SortOption sort, boolean hideIncompatible) {
+        public Query() {
+            this("", SortOption.NONE, false);
         }
 
-        int index = this.items.indexOf(pack);
-        int moveIndex = this.getMoveUpIndex(pack);
-        return index > 0 && moveIndex > -1 && !this.options.isFixed(this.items.get(moveIndex));
-    }
+        public Query withSearch(String search) { return new Query(search, this.sort, this.hideIncompatible); }
+        public Query withSort(SortOption sort) { return new Query(this.search, sort, this.hideIncompatible); }
+        public Query withHideIncompatible(boolean hide) { return new Query(this.search, this.sort, hide); }
 
-    public boolean canMoveDown(Pack pack) {
-        if (!this.canMove(pack)) return false;
-
-        int size = this.items.size();
-        if (this.isSelected(pack)) {
-            List<Pack> selection = this.getOrderedSelection();
-            if (selection.size() > 1) {
-                int index = this.items.indexOf(selection.getLast());
-                int moveIndex = index > -1 ? this.getMoveDownIndex(pack) : -1;
-                return index > -1 && index < size - 1 && moveIndex > -1 && !this.options.isFixed(this.items.get(moveIndex));
-            }
-        }
-
-        int index = this.items.indexOf(pack);
-        int moveIndex = this.getMoveDownIndex(pack);
-        return index > -1 && index < size - 1 && moveIndex > -1 && !this.options.isFixed(this.items.get(moveIndex));
-    }
-
-    private boolean canMove(Pack pack) {
-        return !this.options.isLocked() && !this.options.isFixed(pack) && !this.isQueried();
-    }
-
-    private int getMoveUpIndex(Pack pack) {
-        for (int i = this.items.indexOf(pack) - 1; i >= 0; i--) {
-            Pack nextPack = this.items.get(i);
-            if (this.options.isFixed(nextPack)) {
-                return -1;
-            }
-            if (!this.options.isHidden(nextPack)) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
-    private int getMoveDownIndex(Pack pack) {
-        for (int i = this.items.indexOf(pack) + 1; i < this.items.size(); i++) {
-            Pack nextPack = this.items.get(i);
-            if (this.options.isFixed(nextPack)) {
-                return -1;
-            }
-            if (!this.options.isHidden(nextPack)) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
-    public int clampPosition(int index) {
-        if (index == -1) {
-            int minIndex = 0;
-            for (int i = 0; i < this.items.size(); i++) {
-                Pack pack = this.items.get(i);
-                if (this.options.isFixed(pack) && this.options.getPosition(pack) == Pack.Position.TOP) {
-                    minIndex = i + 1;
-                }
-            }
-            return minIndex;
-        }
-        return index;
-    }
-
-    public boolean isValidDropPosition(int index) {
-        if (index < 0 || index > this.items.size()) return false;
-
-        int minDropIndex = 0;
-        int maxDropIndex = this.items.size();
-        for (int i = 0; i < this.items.size(); i++) {
-            Pack pack = this.items.get(i);
-            if (this.options.isFixed(pack)) {
-                switch (this.options.getPosition(pack)) {
-                    case TOP -> minDropIndex = i + 1;
-                    case BOTTOM -> maxDropIndex = Math.min(i, maxDropIndex);
-                }
-            }
-        }
-
-        return index >= minDropIndex && index <= maxDropIndex;
-    }
-
-    @Override
-    public void replaceState(@NotNull Snapshot snapshot) {
-        this.replaceAll(snapshot.packs);
-        this.clearSelection();
-        this.selectedItems.addAll(snapshot.selection);
-        this.query = new Query(snapshot.query);
-        this.refresh();
-    }
-
-    @Override
-    public @NotNull Snapshot captureState(String eventName) {
-        return new Snapshot(this, List.copyOf(this.items), List.copyOf(this.selectedItems), new Query(this.query));
-    }
-
-    public record Snapshot(
-            PackListModel target,
-            List<Pack> packs,
-            List<Pack> selection,
-            Query query
-    ) implements Restorable.Snapshot<Snapshot> {
-        public Snapshot retainAll(Set<Pack> validPacks) {
-            List<Pack> packs = new ObjectArrayList<>(this.packs.size());
-            CollectionsUtil.addIf(packs, this.packs, validPacks::contains);
-            return new Snapshot(this.target, List.copyOf(packs), this.selection, this.query);
-        }
-
-        public Snapshot replaceAll(List<Pack> packs) {
-            return new Snapshot(this.target, List.copyOf(packs), this.selection, this.query);
+        public enum SortOption {
+            NONE, NAME, ID, COMPATIBILITY
         }
     }
 }
