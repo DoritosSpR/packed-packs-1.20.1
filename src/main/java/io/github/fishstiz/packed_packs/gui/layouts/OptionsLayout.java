@@ -32,37 +32,37 @@ public class OptionsLayout implements Layout {
                 .paddingBottom(-spacing);
 
         for (Config.Packs config : configs) {
-            switch (config) {
-                case Config.ResourcePacks resourcePacks -> {
-                    contentLayout.addChild(
-                            FidgetzText.<Void>builder()
-                                    .setMessage(ResourceUtil.getText("resource_packs"))
-                                    .alignLeft()
-                                    .setWidth(CONTENT_WIDTH)
-                                    .build(),
-                            titleSettings
-                    );
-                    addCommonOptions(contentLayout, resourcePacks);
-                    contentLayout.addChild(
-                            ToggleButton.<Void>builder()
-                                    .setMessage(ResourceUtil.getText("options.apply_on_close"))
-                                    .setValue(resourcePacks.isApplyOnClose())
-                                    .setOnPress(() -> resourcePacks.setApplyOnClose(!resourcePacks.isApplyOnClose()))
-                                    .setWidth(CONTENT_WIDTH)
-                                    .build()
-                    );
-                }
-                case Config.DataPacks dataPacks -> {
-                    contentLayout.addChild(
-                            FidgetzText.<Void>builder()
-                                    .setMessage(Component.translatable("selectWorld.dataPacks"))
-                                    .alignLeft()
-                                    .setWidth(CONTENT_WIDTH)
-                                    .build(),
-                            titleSettings
-                    );
-                    addCommonOptions(contentLayout, dataPacks);
-                }
+            // REESCRITO PARA JAVA 17
+            if (config instanceof Config.ResourcePacks) {
+                Config.ResourcePacks resourcePacks = (Config.ResourcePacks) config;
+                contentLayout.addChild(
+                        FidgetzText.<Void>builder()
+                                .setMessage(ResourceUtil.getText("resource_packs"))
+                                .alignLeft()
+                                .setWidth(CONTENT_WIDTH)
+                                .build(),
+                        titleSettings
+                );
+                addCommonOptions(contentLayout, resourcePacks);
+                contentLayout.addChild(
+                        ToggleButton.<Void>builder()
+                                .setMessage(ResourceUtil.getText("options.apply_on_close"))
+                                .setValue(resourcePacks.isApplyOnClose())
+                                .setOnPress(() -> resourcePacks.setApplyOnClose(!resourcePacks.isApplyOnClose()))
+                                .setWidth(CONTENT_WIDTH)
+                                .build()
+                );
+            } else if (config instanceof Config.DataPacks) {
+                Config.DataPacks dataPacks = (Config.DataPacks) config;
+                contentLayout.addChild(
+                        FidgetzText.<Void>builder()
+                                .setMessage(Component.translatable("selectWorld.dataPacks"))
+                                .alignLeft()
+                                .setWidth(CONTENT_WIDTH)
+                                .build(),
+                        titleSettings
+                );
+                addCommonOptions(contentLayout, dataPacks);
             }
         }
 
@@ -72,7 +72,6 @@ public class OptionsLayout implements Layout {
     public OptionsLayout(Minecraft minecraft, IntSupplier maxHeightSupplier) {
         this(minecraft, maxHeightSupplier, Config.get().getResourcepacks(), Config.get().getDatapacks());
     }
-
 
     @Override
     public void visitWidgets(Consumer<AbstractWidget> visitor) {
