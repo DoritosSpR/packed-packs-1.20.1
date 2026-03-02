@@ -1,7 +1,7 @@
 package io.github.fishstiz.packed_packs.transform.interfaces;
 
 import io.github.fishstiz.packed_packs.pack.PackOptionsResolver;
-import net.minecraft.server.packs.PackSelectionConfig;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.packs.repository.Pack;
 
 public interface ConfiguredPack {
@@ -16,7 +16,11 @@ public interface ConfiguredPack {
         return false;
     }
 
-    PackSelectionConfig packed_packs$originalConfig();
+    // Reemplazamos el objeto inexistente por sus componentes individuales
+    boolean packed_packs$isRequired();
+    boolean packed_packs$isFixed();
+    Pack.Position packed_packs$getDefaultPosition();
 
-    Pack.Metadata packed_packs$getMetadata();
+    // En 1.20.1, si necesitas la descripción, es mejor devolver el Component
+    Component packed_packs$getDescription();
 }
