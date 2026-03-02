@@ -1,7 +1,7 @@
 package io.github.fishstiz.packed_packs.impl;
 
 
-import io.github.fishstiz.fidgetz.util.lang.CollectionsUtil;
+import io.github.fishstiz.packed_packs.util.lang.CollectionsUtil;
 import io.github.fishstiz.packed_packs.api.Event;
 import io.github.fishstiz.packed_packs.api.EventBus;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
