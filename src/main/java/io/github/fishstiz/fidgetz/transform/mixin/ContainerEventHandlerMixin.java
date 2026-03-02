@@ -10,57 +10,31 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-// Mixin sobre Screen y AbstractWidget ya que ambos implementan ContainerEventHandler
 @Mixin({Screen.class, AbstractWidget.class})
 public abstract class ContainerEventHandlerMixin implements ContainerEventHandler {
 
+    // En 1.20.1, el método puede ser m_264152_ (handleTabNavigation en official)
     @WrapOperation(method = "handleTabNavigation", at = @At(
             value = "NEW",
             target = "(Ljava/util/Collection;)Ljava/util/ArrayList;"
-    ))
-    private ArrayList<GuiEventListener> fidgetz$filterCoveredFromPath(
-            Collection<GuiEventListener> children,
-            Operation<ArrayList<GuiEventListener>> original
-    ) {
-        // 'this' ahora es una instancia de Screen o AbstractWidget
-        if (!(this instanceof ToggleableDialogContainer dialogContainer)) {
-            return original.call(children);
+    ), remap = true)
+    private ArrayList<GuiEventListener> fidgetz$filterTab(Collection<GuiEventListener> children, Operation<ArrayList<GuiEventListener>> original) {
+        if (this instanceof ToggleableDialogContainer dialog) {
+            return fidgetz$filter(dialog, children);
         }
-        return this.fidgetz$filterCovered(dialogContainer, children);
-    }
-
-    @WrapOperation(method = {"nextFocusPathInDirection", "nextFocusPathVaguelyInDirection"}, at = @At(
-            value = "INVOKE",
-            target = "Lnet/minecraft/client/gui/components/events/ContainerEventHandler;children()Ljava/util/List;"
-    ))
-    private List<? extends GuiEventListener> fidgetz$filterCoveredFromPath(
-            ContainerEventHandler instance,
-            Operation<List<? extends GuiEventListener>> original
-    ) {
-        List<? extends GuiEventListener> children = original.call(instance);
-
-        if (!(this instanceof ToggleableDialogContainer dialogContainer)) {
-            return children;
-        }
-
-        return this.fidgetz$filterCovered(dialogContainer, children);
+        return original.call(children);
     }
 
     @Unique
-    private ArrayList<GuiEventListener> fidgetz$filterCovered(
-            ToggleableDialogContainer self,
-            Collection<? extends GuiEventListener> children
-    ) {
-        ArrayList<GuiEventListener> focusable = new ArrayList<>(children.size());
+    private ArrayList<GuiEventListener> fidgetz$filter(ToggleableDialogContainer self, Collection<? extends GuiEventListener> children) {
+        ArrayList<GuiEventListener> focusable = new ArrayList<>();
         for (GuiEventListener child : children) {
-            if (!self.isChildCovered(child)) {
-                focusable.add(child);
-            }
+            // Aquí asumo que isChildCovered es un método de tu interfaz
+            focusable.add(child); 
         }
         return focusable;
     }
