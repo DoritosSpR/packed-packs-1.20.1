@@ -50,9 +50,9 @@ repositories {
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
-    // Fidgetz dependencies
-    implementation project(':fidgetz:common')
-    implementation project(':fidgetz:forge')
+    // Forzamos a que use la configuración 'api' o 'runtime'
+    implementation project(path: ':fidgetz:common', configuration: 'default')
+    implementation project(path: ':fidgetz:forge', configuration: 'default')
 
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
@@ -110,3 +110,4 @@ publishing {
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
+
