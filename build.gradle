@@ -45,16 +45,27 @@ sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 repositories {
     mavenCentral()
+    maven { url 'https://jitpack.io' }
+    maven { url 'https://repo.spongepowered.org/repository/maven-public/' }
 }
 
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
-    // Forzamos a que use la configuración 'api' o 'runtime'
+    // MixinExtras: Fundamental para que funcionen @WrapOperation y otros
+    compileOnly annotationProcessor("com.github.LlamaLad7:MixinExtras:0.1.1")
+    implementation ("com.github.LlamaLad7:MixinExtras:0.1.1")
+
     implementation project(path: ':fidgetz:common', configuration: 'default')
     implementation project(path: ':fidgetz:forge', configuration: 'default')
 
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+}
+
+// Añade esto al final para que Mixin sepa qué archivos procesar
+mixin {
+    add sourceSets.main, "packed_packs.refmap.json"
+    config "packed_packs.mixins.json"
 }
 
 // ESTA SECCIÓN HA SIDO CORREGIDA PARA EVITAR EL ERROR "Unexpected input: '{'"
@@ -110,4 +121,5 @@ publishing {
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
+
 
