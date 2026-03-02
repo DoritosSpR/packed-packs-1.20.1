@@ -12,44 +12,28 @@ base {
     archivesName = mod_id
 }
 
-// Minecraft 1.20.1 requiere Java 17
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
 println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
 
 minecraft {
-    // Estas variables deben estar definidas en tu gradle.properties
     mappings channel: mapping_channel, version: mapping_version
-
     copyIdeResources = true
 
     runs {
         configureEach {
             workingDirectory project.file('run')
-
             property 'forge.logging.markers', 'REGISTRIES'
             property 'forge.logging.console.level', 'debug'
-
             mods {
                 "${mod_id}" {
                     source sourceSets.main
                 }
             }
         }
-
-        client {
-            property 'forge.enabledGameTestNamespaces', mod_id
-        }
-
-        server {
-            property 'forge.enabledGameTestNamespaces', mod_id
-            args '--nogui'
-        }
-
-        gameTestServer {
-            property 'forge.enabledGameTestNamespaces', mod_id
-        }
-
+        client { property 'forge.enabledGameTestNamespaces', mod_id }
+        server { property 'forge.enabledGameTestNamespaces', mod_id; args '--nogui' }
+        gameTestServer { property 'forge.enabledGameTestNamespaces', mod_id }
         data {
             workingDirectory project.file('run-data')
             args '--mod', mod_id, '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
@@ -61,23 +45,20 @@ sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 repositories {
     mavenCentral()
-    // Repositorios para Mixin y otras dependencias si las hubiera
 }
 
 dependencies {
-    // Minecraft Forge core
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
-    // Dependencias de Fidgetz (Subproyectos locales)
-    // Usamos el cierre de configuración para asegurar que Gradle encuentre los artefactos correctos
+    // Fidgetz dependencies
     implementation project(':fidgetz:common')
     implementation project(':fidgetz:forge')
 
-    // Si usas Mixins, asegúrate de tener la anotación aquí
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
 
-tasks.named('processResources', ProcessResources).configure {
+// ESTA SECCIÓN HA SIDO CORREGIDA PARA EVITAR EL ERROR "Unexpected input: '{'"
+processResources {
     var replaceProperties = [
             minecraft_version: minecraft_version, 
             minecraft_version_range: minecraft_version_range,
@@ -85,4 +66,27 @@ tasks.named('processResources', ProcessResources).configure {
             forge_version_range: forge_version_range,
             loader_version_range: loader_version_range,
             mod_id: mod_id, 
-            mod_name: mod_name,
+            mod_name: mod_name, 
+            mod_license: mod_license, 
+            mod_version: mod_version,
+            mod_authors: mod_authors, 
+            mod_description: mod_description,
+    ]
+    inputs.properties replaceProperties
+
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+        expand replaceProperties + [project: project]
+    }
+}
+
+tasks.named('jar', Jar).configure {
+    manifest {
+        attributes([
+                'Specification-Title'     : mod_id,
+                'Specification-Vendor'    : mod_authors,
+                'Specification-Version'   : '1',
+                'Implementation-Title'    : project.name,
+                'Implementation-Version'  : project.jar.archiveVersion,
+                'Implementation-Vendor'   : mod_authors,
+                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+        ])
