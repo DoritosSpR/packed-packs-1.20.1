@@ -1,6 +1,5 @@
 package io.github.fishstiz.packed_packs.config;
 
-import net.minecraft.server.packs.PackSelectionConfig;
 import net.minecraft.server.packs.repository.Pack;
 
 public interface PackOptions {
@@ -11,6 +10,5 @@ public interface PackOptions {
     boolean isFixed(Pack pack);
 
     Pack.Position getPosition(Pack pack);
-
-    PackSelectionConfig getSelectionConfig(Pack pack);
+    // Se elimina getSelectionConfig porque PackSelectionConfig no existe en 1.20.1
 }
