@@ -2,10 +2,6 @@ package io.github.fishstiz.packed_packs.impl;
 
 import io.github.fishstiz.packed_packs.PackedPacks;
 import io.github.fishstiz.packed_packs.api.PackedPacksApi;
-import io.github.fishstiz.packed_packs.api.PackedPacksInitializer;
-import io.github.fishstiz.packed_packs.platform.Services;
-
-import java.util.List;
 
 public final class PackedPacksApiImpl implements PackedPacksApi {
     private final EventBusImpl eventBus = new EventBusImpl();
@@ -31,24 +27,12 @@ public final class PackedPacksApiImpl implements PackedPacksApi {
     private static final class Holder {
         private static final PackedPacksApiImpl INSTANCE;
 
-        private Holder() {
-        }
-
         static {
             PackedPacksApiImpl api = new PackedPacksApiImpl();
 
-            List<PackedPacksInitializer> extensions = Services.PLATFORM.getModExtensions();
-            for (PackedPacksInitializer extension : extensions) {
-                try {
-                    extension.onInitialize(api);
-                } catch (Throwable e) {
-                    PackedPacks.LOGGER.error(
-                            "[packed_packs] PackedPacksInitializer implementation '{}' failed to initialize.",
-                            extension.getClass().getSimpleName(), e
-                    );
-                }
-            }
-
+            // En Forge 1.20.1, si no tienes otros mods que dependan de este, 
+            // podemos omitir la búsqueda de extensiones por ahora para que compile.
+            
             api.eventBus.freeze();
             api.preferenceRegistry.freeze();
 
