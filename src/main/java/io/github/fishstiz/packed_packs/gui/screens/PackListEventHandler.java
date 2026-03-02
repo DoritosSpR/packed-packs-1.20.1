@@ -1,175 +1,96 @@
 package io.github.fishstiz.packed_packs.gui.screens;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import io.github.fishstiz.packed_packs.compat.minecraftcursor.MinecraftCursor;
-import io.github.fishstiz.packed_packs.gui.components.events.*;
+import io.github.fishstiz.fidgetz.gui.components.ToggleableDialogContainer;
+import io.github.fishstiz.packed_packs.gui.components.events.PackListEvent;
+import io.github.fishstiz.packed_packs.gui.components.events.PackListEventListener;
+import io.github.fishstiz.packed_packs.gui.components.pack.FileRenameModal;
+import io.github.fishstiz.packed_packs.gui.components.pack.FolderDialog;
 import io.github.fishstiz.packed_packs.gui.components.pack.PackList;
-import io.github.fishstiz.packed_packs.pack.PackAssetManager;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.ComponentPath;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.events.GuiEventListener;
+import io.github.fishstiz.packed_packs.gui.components.pack.PackListDevMenu;
+import io.github.fishstiz.packed_packs.gui.screens.history.PackStateHistory;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.network.chat.Component;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.server.packs.repository.Pack;
 
 import java.util.List;
 
-public abstract class PackListEventHandler extends Screen implements PackListEventListener, DragEventHandler {
-    protected final PackAssetManager assetManager;
-    private final DragEventRenderer dragEventRenderer;
-    private DragEvent dragged;
+import static io.github.fishstiz.packed_packs.gui.components.events.PackListEvent.*;
 
-    protected PackListEventHandler(Minecraft minecraft, Component title) {
-        super(title);
-        this.minecraft = minecraft;
-        this.assetManager = new PackAssetManager(minecraft);
-        this.dragEventRenderer = new DragEventRenderer(this.assetManager);
+public abstract class PackListEventHandler<S extends Screen & ToggleableDialogContainer & PackListEventListener> extends PackListScreen<S> implements PackListEventListener {
+    protected final PackStateHistory history = new PackStateHistory();
+
+    public PackListEventHandler(S screen) {
+        super(screen);
     }
-
-    protected void focus(ComponentPath path) {
-        this.clearFocus();
-        path.applyFocus(true);
-    }
-
-    protected void focus(GuiEventListener element) {
-        this.focus(ComponentPath.path(element, this));
-    }
-
-    protected void focusList(PackList packList) {
-        PackList.Entry entry = packList.getSelected();
-
-        if (entry != null) {
-            this.focus(ComponentPath.path(entry, packList, this));
-        } else {
-            this.focus(ComponentPath.path(packList, this));
-        }
-    }
-
-    protected void transferFocus(PackList source, PackList destination) {
-        source.setFocused(null);
-        this.focusList(destination);
-    }
-
-    protected void unfocusOtherLists(PackList focused) {
-        for (PackList packList : this.getPackLists()) {
-            if (packList != focused) {
-                packList.setFocused(null);
-            }
-        }
-    }
-
-    protected void handleRequestTransferEvent(RequestTransferEvent event) {
-        PackList source = event.target();
-        PackList destination = this.getDestination(source);
-
-        if (destination == null || event.payload().isEmpty()) {
-            return;
-        }
-
-        destination.clearSelection();
-        source.removeAll(event.payload());
-        destination.addAll(event.payload());
-        destination.selectAll(event.payload());
-        destination.select(event.trigger());
-
-        this.transferFocus(source, destination);
-    }
-
-    @Override
-    public void handleDragEvent(DragEvent event) {
-        DragEventHandler.super.handleDragEvent(event);
-        this.unfocusOtherLists(event.target());
-    }
-
-    protected void handleMoveEvent(MoveEvent event) {
-        PackList.Entry entry = event.target().getEntry(event.trigger());
-        if (entry != null) {
-            this.focus(ComponentPath.path(entry, event.target(), this));
-        } else {
-            this.focus(event.target());
-        }
-    }
-
-    @Override
-    public @Nullable DragEvent getDragged() {
-        return this.dragged;
-    }
-
-    @Override
-    public void setDragged(@Nullable DragEvent dragged) {
-        this.dragged = dragged;
-    }
-
-    public abstract @NotNull List<PackList> getPackLists();
-
-    protected abstract @Nullable PackList getDestination(PackList source);
-
-    public abstract boolean isUnlocked();
 
     @Override
     public void onEvent(PackListEvent event) {
-        switch (event) {
-            case SelectionEvent selection -> this.unfocusOtherLists(selection.target());
-            case RequestTransferEvent request -> this.handleRequestTransferEvent(request);
-            case MoveEvent move -> this.handleMoveEvent(move);
-            case DragEvent drag -> this.handleDragEvent(drag);
-            case DropEvent drop -> this.transferFocus(drop.target(), drop.destination());
-            default -> {
-            }
+        super.onEvent(event);
+
+        this.profiles.getSidebar().setOpen(false);
+        this.contextMenu.setOpen(false);
+        this.fileRenameModal.setOpen(false);
+        if (this.aliasModal != null) this.aliasModal.closeModal();
+
+        boolean notFolderDialogEvent = event.target() != this.folderDialog.root();
+        if (notFolderDialogEvent) this.folderDialog.setOpen(false);
+
+        // REESCRITO PARA JAVA 17: Reemplazo de switch pattern por if-instanceof
+        if (event instanceof FileDeleteEvent) {
+            this.revalidatePacks();
+        } else if (event instanceof FileRenameOpenEvent) {
+            FileRenameOpenEvent e = (FileRenameOpenEvent) event;
+            this.fileRenameModal.open(e.target(), e.trigger());
+        } else if (event instanceof FileRenameEvent) {
+            this.onFileRename((FileRenameEvent) event);
+        } else if (event instanceof FileRenameCloseEvent) {
+            FileRenameCloseEvent e = (FileRenameCloseEvent) event;
+            this.focusList(e.target());
+        } else if (event instanceof FolderOpenEvent) {
+            this.onFolderOpen((FolderOpenEvent) event);
+        } else if (event instanceof FolderCloseEvent) {
+            this.onFolderClose((FolderCloseEvent) event);
+        } else if (event instanceof PackAliasOpenEvent) {
+            this.onOpenAliases((PackAliasOpenEvent) event);
+        }
+
+        if (this.isUnlocked() && event.pushToHistory() && notFolderDialogEvent) {
+            this.history.push(this.captureState());
         }
     }
 
     @Override
-    public void onRelease(@NotNull DragEvent event, double mouseX, double mouseY) {
-        List<PackList> packLists = this.getPackLists();
-        for (int i = packLists.size() - 1; i >= 0; i--) {
-            PackList packList = packLists.get(i);
-            if (packList.isHovered()) {
-                packList.drop(event, mouseX, mouseY);
-                return;
-            }
+    public void onSelection(SelectionEvent event) {
+        // REESCRITO PARA JAVA 17
+        if (event instanceof SelectionEvent) {
+            this.unfocusOtherLists(event.target());
         }
     }
 
-    @Override
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        super.render(guiGraphics, mouseX, mouseY, partialTick);
+    protected void onFileRename(FileRenameEvent event) {
+        this.revalidatePacks();
+    }
 
-        DragEvent event = this.getDragged();
-        if (event != null) {
-            PackList source = event.target();
-            boolean validDrop = false;
+    protected void onFolderOpen(FolderOpenEvent event) {
+        this.folderDialog.open(event.target(), event.trigger());
+    }
 
-            PoseStack poseStack = guiGraphics.pose();
-            poseStack.pushPose();
-            poseStack.translate(0, 0, this.getDroppableZ());
+    protected void onFolderClose(FolderCloseEvent event) {
+        this.focusList(event.target());
+    }
 
-            if (this.isUnlocked()) {
-                for (PackList list : this.getPackLists()) {
-                    list.renderDroppableZone(guiGraphics, event, mouseX, mouseY, partialTick);
-                    if (!validDrop && list.isMouseOver(mouseX, mouseY)) {
-                        validDrop = source == list || source.canInteract(list);
-                    }
-                }
-            }
-
-            poseStack.translate(0, 0, 1f);
-            this.dragEventRenderer.renderDragEvent(event, guiGraphics, mouseX, mouseY, partialTick);
-            poseStack.popPose();
-
-            MinecraftCursor.handleDrag(validDrop);
+    protected void onOpenAliases(PackAliasOpenEvent event) {
+        if (this.aliasModal != null) {
+            this.aliasModal.open(event.target(), event.trigger());
         }
     }
 
-    @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        return this.isDraggingSelection() || super.keyPressed(keyCode, scanCode, modifiers);
-    }
+    protected abstract void revalidatePacks();
 
-    @Override
-    public boolean charTyped(char codePoint, int modifiers) {
-        return this.isDraggingSelection() || super.charTyped(codePoint, modifiers);
-    }
+    protected abstract void focusList(PackList packList);
+
+    protected abstract void unfocusOtherLists(PackList packList);
+
+    protected abstract PackStateHistory.State captureState();
+
+    protected abstract boolean isUnlocked();
 }
