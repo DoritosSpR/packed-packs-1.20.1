@@ -25,6 +25,15 @@ public class PackedPacks {
         LOGGER.info("Packed Packs para Forge 1.20.1 inicializado.");
     }
 
+    public PackedPacks() {
+        IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
+
+        // Esto fuerza la carga del API y congela los registros
+        PackedPacksApiImpl.getInstance();
+
+        LOGGER.info("Packed Packs 1.20.1: Sistema de preferencias y eventos activado.");
+    }
+    
     public static Path getConfigDir() {
         // En Forge 1.20.1 usamos FMLPaths para obtener la carpeta de config directamente
         return FMLPaths.CONFIGDIR.get().resolve(MOD_ID);
