@@ -5,6 +5,8 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.fishstiz.fidgetz.gui.components.ToggleableDialogContainer;
 import net.minecraft.client.gui.components.events.ContainerEventHandler;
 import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.AbstractWidget;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -13,16 +15,19 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-@Mixin(ContainerEventHandler.class)
-public interface ContainerEventHandlerMixin {
+// Mixin sobre Screen y AbstractWidget ya que ambos implementan ContainerEventHandler
+@Mixin({Screen.class, AbstractWidget.class})
+public abstract class ContainerEventHandlerMixin implements ContainerEventHandler {
+
     @WrapOperation(method = "handleTabNavigation", at = @At(
             value = "NEW",
             target = "(Ljava/util/Collection;)Ljava/util/ArrayList;"
     ))
-    private ArrayList<GuiEventListener> filterCoveredFromPath(
+    private ArrayList<GuiEventListener> fidgetz$filterCoveredFromPath(
             Collection<GuiEventListener> children,
             Operation<ArrayList<GuiEventListener>> original
     ) {
+        // 'this' ahora es una instancia de Screen o AbstractWidget
         if (!(this instanceof ToggleableDialogContainer dialogContainer)) {
             return original.call(children);
         }
@@ -33,7 +38,7 @@ public interface ContainerEventHandlerMixin {
             value = "INVOKE",
             target = "Lnet/minecraft/client/gui/components/events/ContainerEventHandler;children()Ljava/util/List;"
     ))
-    private List<? extends GuiEventListener> filterCoveredFromPath(
+    private List<? extends GuiEventListener> fidgetz$filterCoveredFromPath(
             ContainerEventHandler instance,
             Operation<List<? extends GuiEventListener>> original
     ) {
