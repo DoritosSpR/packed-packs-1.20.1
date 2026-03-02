@@ -26,7 +26,6 @@ import java.util.function.Consumer;
 
 import static io.github.fishstiz.packed_packs.gui.components.ToggleableHelper.getDefaultIcon;
 import static io.github.fishstiz.packed_packs.util.constants.GuiConstants.*;
-import static io.github.fishstiz.packed_packs.util.constants.GuiConstants.devItem;
 import static io.github.fishstiz.fidgetz.util.lang.ObjectsUtil.pick;
 
 public record PackListDevMenu(
@@ -54,29 +53,15 @@ public record PackListDevMenu(
 
     public sealed interface Event<T> {
         Pack trigger();
-
         List<Pack> packs();
-
         T value();
 
         record EditAliases(Pack trigger, Boolean value) implements Event<Boolean> {
-            public List<Pack> packs() {
-                return List.of(this.trigger);
-            }
+            public List<Pack> packs() { return List.of(this.trigger); }
         }
-
-        record Hide(Pack trigger, Boolean value, List<Pack> packs) implements Event<Boolean> {
-        }
-
-        record Require(Pack trigger, @Nullable Boolean value, List<Pack> packs) implements Event<Boolean> {
-        }
-
-        record Reposition(
-                Pack trigger,
-                @Nullable PackOverride.Position value,
-                List<Pack> packs
-        ) implements Event<PackOverride.Position> {
-        }
+        record Hide(Pack trigger, Boolean value, List<Pack> packs) implements Event<Boolean> {}
+        record Require(Pack trigger, @Nullable Boolean value, List<Pack> packs) implements Event<Boolean> {}
+        record Reposition(Pack trigger, @Nullable PackOverride.Position value, List<Pack> packs) implements Event<PackOverride.Position> {}
     }
 
     @FunctionalInterface
@@ -147,7 +132,7 @@ public record PackListDevMenu(
         this.options.getProfile().ifPresent(profile -> {
             List<Pack> selected = this.getPackOrSelection();
             profile.setHidden(hidden, selected);
-            this.notifyListener(hidden, selected, Event.Hide::new);
+            this.notifyListener(hidden, selected, (p, v, s) -> new Event.Hide(p, v, s));
         });
     }
 
@@ -155,7 +140,7 @@ public record PackListDevMenu(
         this.options.getProfile().ifPresent(profile -> {
             List<Pack> selected = this.getPackOrSelection();
             profile.setRequired(required, selected);
-            this.notifyListener(required, selected, Event.Require::new);
+            this.notifyListener(required, selected, (p, v, s) -> new Event.Require(p, v, s));
         });
     }
 
@@ -163,7 +148,7 @@ public record PackListDevMenu(
         this.options.getProfile().ifPresent(profile -> {
             List<Pack> selected = this.getPackOrSelection();
             profile.setPosition(position, selected);
-            this.notifyListener(position, selected, Event.Reposition::new);
+            this.notifyListener(position, selected, (p, v, s) -> new Event.Reposition(p, v, s));
         });
     }
 
@@ -261,16 +246,15 @@ public record PackListDevMenu(
                 .build());
 
         builder.add(devItem(REMOVE_OVERRIDES).action(this::resetOverrides).build()).separator();
-
         this.buildNonOverrideOptions(builder);
     }
 
     private static int getBackgroundColor(ProfileScope overrideScope) {
         return switch (overrideScope) {
-            case NONE -> Theme.WHITE.withAlpha(0);
-            case LOCAL -> Theme.BLACK.withAlpha(0.75f);
-            case GLOBAL -> Theme.BLUE_500.withAlpha(0.75f);
-            case COMPOSITE -> Theme.PURPLE_500.withAlpha(0.75f);
+            case NONE -> Theme.WHITE.withAlpha(0).getARGB();
+            case LOCAL -> Theme.BLACK.withAlpha(0.75f).getARGB();
+            case GLOBAL -> Theme.BLUE_500.withAlpha(0.75f).getARGB();
+            case COMPOSITE -> Theme.PURPLE_500.withAlpha(0.75f).getARGB();
         };
     }
 }
