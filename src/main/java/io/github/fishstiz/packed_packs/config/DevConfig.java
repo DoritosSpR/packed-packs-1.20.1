@@ -1,5 +1,6 @@
 package io.github.fishstiz.packed_packs.config;
 
+import io.github.fishstiz.packed_packs.util.JsonLoader;
 import io.github.fishstiz.fidgetz.util.lang.CollectionsUtil;
 import io.github.fishstiz.packed_packs.PackedPacks;
 import io.github.fishstiz.packed_packs.util.AliasRegex;
