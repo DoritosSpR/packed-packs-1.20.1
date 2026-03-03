@@ -119,7 +119,7 @@ public class PackUtil {
     public static List<Pack> flattenPacks(Collection<Pack> packs) {
         List<Pack> flattened = new ObjectArrayList<>();
         for (Pack pack : packs) {
-            if (pack instanceof FolderPack folderPack) {
+            if (pack.getId().startsWith("folder/")) {
                 flattened.addAll(folderPack.flatten());
             } else {
                 flattened.add(pack);
