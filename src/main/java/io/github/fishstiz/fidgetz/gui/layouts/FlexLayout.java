@@ -22,8 +22,9 @@ public class FlexLayout implements Layout {
     private int spacing;
 
     private FlexLayout(LinearLayout.Orientation orientation, @Nullable IntSupplier maxSizeAtOrientation, int minWidth, int minHeight, int spacing) {
-        this.wrappedLayout = new LinearLayout(0, 0, orientation).spacing(spacing);
         this.orientation = orientation;
+        this.wrappedLayout = new LinearLayout(orientation);
+        this.wrappedLayout.spacing(spacing);
         this.maxSizeAtOrientation = maxSizeAtOrientation;
         this.minWidth = minWidth;
         this.minHeight = minHeight;
@@ -34,7 +35,7 @@ public class FlexLayout implements Layout {
         this(orientation, maxSizeAtOrientation, 0, 0, 0);
     }
 
-    private void addChild(Child<? extends LayoutElement> child) {
+    private void addChildInternal(Child<? extends LayoutElement> child) {
         this.children.add(child);
         switch (this.orientation) {
             case VERTICAL -> this.minWidth = Math.max(this.minWidth, child.getWidth());
@@ -43,7 +44,7 @@ public class FlexLayout implements Layout {
     }
 
     public <T extends LayoutElement> T addChild(T child, LayoutSettings layoutSettings) {
-        this.addChild(new Child<>(child, layoutSettings));
+        this.addChildInternal(new Child<>(child, layoutSettings));
         return this.wrappedLayout.addChild(child, layoutSettings);
     }
 
@@ -52,7 +53,7 @@ public class FlexLayout implements Layout {
     }
 
     public <T extends AbstractWidget> T addFlexChild(T child, boolean crossAxis, LayoutSettings layoutSettings) {
-        this.addChild(new FlexWidget(child, crossAxis, layoutSettings));
+        this.addChildInternal(new FlexWidget(child, crossAxis, layoutSettings));
         return this.wrappedLayout.addChild(child, layoutSettings);
     }
 
@@ -65,7 +66,7 @@ public class FlexLayout implements Layout {
     }
 
     public <T extends FlexLayout> T addFlexChild(T child, boolean crossAxis, LayoutSettings layoutSettings) {
-        this.addChild(new NestedFlexLayout(child, crossAxis, layoutSettings));
+        this.addChildInternal(new NestedFlexLayout(child, crossAxis, layoutSettings));
         return this.wrappedLayout.addChild(child, layoutSettings);
     }
 
@@ -84,39 +85,6 @@ public class FlexLayout implements Layout {
         };
     }
 
-    private int getPaddingAtOrientation(Child<?> child) {
-        LayoutSettings.LayoutSettingsImpl layoutSettings = child.layoutSettings.getExposed();
-        return switch (this.orientation) {
-            case HORIZONTAL -> layoutSettings.paddingLeft + layoutSettings.paddingRight;
-            case VERTICAL -> layoutSettings.paddingTop + layoutSettings.paddingBottom;
-        };
-    }
-
-    private int getFlexDistribution() {
-        int padding = 0;
-        int totalSize = 0;
-        int flexCount = 0;
-
-        for (int i = 0; i < this.children.size(); i++) {
-            Child<?> child = this.children.get(i);
-
-            if (child instanceof FlexChild<?>) {
-                flexCount++;
-            } else {
-                totalSize += child.getSizeAtOrientation(this.orientation);
-            }
-
-            if (i < this.children.size() - 1) {
-                totalSize += spacing;
-            }
-
-            padding += this.getPaddingAtOrientation(child);
-        }
-
-        int max = this.maxSizeAtOrientation != null ? this.maxSizeAtOrientation.getAsInt() : this.getMinSizeAtOrientation();
-        return flexCount > 0 ? (max - padding - totalSize) / flexCount : 0;
-    }
-
     @Override
     public void arrangeElements() {
         int distribution = this.getFlexDistribution();
@@ -126,44 +94,34 @@ public class FlexLayout implements Layout {
                 flexChild.setDistribution(this.orientation, distribution, this.minWidth, this.minHeight);
             }
         }
-
         this.wrappedLayout.arrangeElements();
     }
 
-    @Override
-    public void visitChildren(Consumer<LayoutElement> visitor) {
-        this.wrappedLayout.visitChildren(visitor);
+    private int getFlexDistribution() {
+        int totalSize = 0;
+        int flexCount = 0;
+
+        for (int i = 0; i < this.children.size(); i++) {
+            Child<?> child = this.children.get(i);
+            if (child instanceof FlexChild<?>) {
+                flexCount++;
+            } else {
+                totalSize += child.getSizeAtOrientation(this.orientation);
+            }
+            if (i < this.children.size() - 1) totalSize += spacing;
+        }
+
+        int max = this.maxSizeAtOrientation != null ? this.maxSizeAtOrientation.getAsInt() : this.getMinSizeAtOrientation();
+        return flexCount > 0 ? Math.max(0, (max - totalSize) / flexCount) : 0;
     }
 
-    @Override
-    public void setX(int x) {
-        this.wrappedLayout.setX(x);
-    }
-
-    @Override
-    public void setY(int y) {
-        this.wrappedLayout.setY(y);
-    }
-
-    @Override
-    public int getX() {
-        return this.wrappedLayout.getX();
-    }
-
-    @Override
-    public int getY() {
-        return this.wrappedLayout.getY();
-    }
-
-    @Override
-    public int getWidth() {
-        return Math.max(this.minWidth, this.wrappedLayout.getWidth());
-    }
-
-    @Override
-    public int getHeight() {
-        return Math.max(this.minHeight, this.wrappedLayout.getHeight());
-    }
+    @Override public void visitChildren(Consumer<LayoutElement> visitor) { this.wrappedLayout.visitChildren(visitor); }
+    @Override public void setX(int x) { this.wrappedLayout.setX(x); }
+    @Override public void setY(int y) { this.wrappedLayout.setY(y); }
+    @Override public int getX() { return this.wrappedLayout.getX(); }
+    @Override public int getY() { return this.wrappedLayout.getY(); }
+    @Override public int getWidth() { return Math.max(this.minWidth, this.wrappedLayout.getWidth()); }
+    @Override public int getHeight() { return Math.max(this.minHeight, this.wrappedLayout.getHeight()); }
 
     public FlexLayout spacing(int spacing) {
         this.wrappedLayout.spacing(spacing);
@@ -171,25 +129,10 @@ public class FlexLayout implements Layout {
         return this;
     }
 
-    public FlexLayout copyLayout() {
-        return new FlexLayout(this.orientation, this.maxSizeAtOrientation, this.minWidth, this.minHeight, this.spacing);
-    }
-
-    public static FlexLayout horizontal(IntSupplier maxWidth) {
-        return new FlexLayout(LinearLayout.Orientation.HORIZONTAL, maxWidth);
-    }
-
-    public static FlexLayout horizontal() {
-        return new FlexLayout(LinearLayout.Orientation.HORIZONTAL, null);
-    }
-
-    public static FlexLayout vertical(IntSupplier maxHeight) {
-        return new FlexLayout(LinearLayout.Orientation.VERTICAL, maxHeight);
-    }
-
-    public static FlexLayout vertical() {
-        return new FlexLayout(LinearLayout.Orientation.VERTICAL, null);
-    }
+    public static FlexLayout horizontal(IntSupplier maxWidth) { return new FlexLayout(LinearLayout.Orientation.HORIZONTAL, maxWidth); }
+    public static FlexLayout horizontal() { return new FlexLayout(LinearLayout.Orientation.HORIZONTAL, null); }
+    public static FlexLayout vertical(IntSupplier maxHeight) { return new FlexLayout(LinearLayout.Orientation.VERTICAL, maxHeight); }
+    public static FlexLayout vertical() { return new FlexLayout(LinearLayout.Orientation.VERTICAL, null); }
 
     private static class Child<T extends LayoutElement> {
         protected final T element;
@@ -203,73 +146,39 @@ public class FlexLayout implements Layout {
         protected int getSizeAtOrientation(LinearLayout.Orientation orientation) {
             return orientation == LinearLayout.Orientation.HORIZONTAL ? this.getWidth() : this.getHeight();
         }
-
-        protected int getWidth() {
-            return this.element.getWidth();
-        }
-
-        protected int getHeight() {
-            return this.element.getHeight();
-        }
+        protected int getWidth() { return this.element.getWidth(); }
+        protected int getHeight() { return this.element.getHeight(); }
     }
 
     private abstract static class FlexChild<T extends LayoutElement> extends Child<T> {
         protected final boolean crossAxis;
-
         protected FlexChild(T element, boolean crossAxis, LayoutSettings layoutSettings) {
             super(element, layoutSettings);
-
             this.crossAxis = crossAxis;
         }
-
         protected abstract void setWidth(int width);
-
         protected abstract void setHeight(int height);
 
         protected void setDistribution(LinearLayout.Orientation orientation, int distribution, int width, int height) {
             if (orientation == LinearLayout.Orientation.HORIZONTAL) {
                 this.setWidth(distribution);
-                if (this.crossAxis && height > 0) {
-                    this.setHeight(height);
-                }
+                if (this.crossAxis && height > 0) this.setHeight(height);
             } else {
                 this.setHeight(distribution);
-                if (this.crossAxis && width > 0) {
-                    this.setWidth(width);
-                }
+                if (this.crossAxis && width > 0) this.setWidth(width);
             }
         }
     }
 
     private static class FlexWidget extends FlexChild<AbstractWidget> {
-        private FlexWidget(AbstractWidget element, boolean crossAxis, LayoutSettings layoutSettings) {
-            super(element, crossAxis, layoutSettings);
-        }
-
-        @Override
-        protected void setWidth(int width) {
-            this.element.setWidth(width);
-        }
-
-        @Override
-        protected void setHeight(int height) {
-            this.element.setHeight(height);
-        }
+        private FlexWidget(AbstractWidget element, boolean crossAxis, LayoutSettings layoutSettings) { super(element, crossAxis, layoutSettings); }
+        @Override protected void setWidth(int width) { this.element.setWidth(width); }
+        @Override protected void setHeight(int height) { this.element.setHeight(height); }
     }
 
     private static class NestedFlexLayout extends FlexChild<FlexLayout> {
-        private NestedFlexLayout(FlexLayout element, boolean crossAxis, LayoutSettings layoutSettings) {
-            super(element, crossAxis, layoutSettings);
-        }
-
-        @Override
-        protected void setWidth(int width) {
-            this.element.minWidth = width;
-        }
-
-        @Override
-        protected void setHeight(int height) {
-            this.element.minHeight = height;
-        }
+        private NestedFlexLayout(FlexLayout element, boolean crossAxis, LayoutSettings layoutSettings) { super(element, crossAxis, layoutSettings); }
+        @Override protected void setWidth(int width) { this.element.minWidth = width; }
+        @Override protected void setHeight(int height) { this.element.minHeight = height; }
     }
 }
