@@ -5,7 +5,7 @@ import io.github.fishstiz.fidgetz.gui.renderables.sprites.ButtonSprites;
 import io.github.fishstiz.fidgetz.gui.renderables.sprites.Sprite;
 import io.github.fishstiz.fidgetz.gui.shapes.Size;
 import io.github.fishstiz.packed_packs.util.ResourceUtil;
-import io.github.fishstiz.packed_packs.pack.folder.FolderPack;
+import io.github.fishstiz.packed_packs.pack.FolderPack;
 import io.github.fishstiz.packed_packs.util.PackUtil;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.network.chat.Component;
