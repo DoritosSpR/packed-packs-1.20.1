@@ -1,86 +1,20 @@
 package io.github.fishstiz.packed_packs.pack.folder;
 
-import io.github.fishstiz.packed_packs.config.JsonLoader;
-import io.github.fishstiz.packed_packs.config.Folder;
-import io.github.fishstiz.packed_packs.transform.interfaces.FilePack;
-import io.github.fishstiz.packed_packs.util.PackUtil;
-import io.github.fishstiz.packed_packs.util.ResourceUtil;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import net.minecraft.Util;
-import net.minecraft.network.chat.Component;
-import net.minecraft.server.packs.*;
+import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.repository.Pack;
-import net.minecraft.server.packs.repository.PackCompatibility;
-import net.minecraft.world.flag.FeatureFlagSet;
-import org.jetbrains.annotations.Nullable;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.util.Collections;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Function;
 
-public class FolderPack extends Pack implements FilePack {
-    public static final Component FOLDER_OPEN_TEXT = ResourceUtil.getText("folder.open");
-    public static final Component FOLDER_DESCRIPTION = ResourceUtil.getText("folder");
-    
-    private final Function<FolderPack, List<Pack>> nestedPacksProvider;
-    private final Path path;
-
-    public FolderPack(String id, String name, Function<FolderPack, List<Pack>> nestedPacksProvider, Path path) {
-        // Constructor de Minecraft 1.20.1
-        super(
+public class FolderPack {
+    // Ejemplo de la línea que fallaba en el constructor/supplier:
+    public static Pack create(String id, Path path) {
+        return Pack.readMetaAndCreate(
             id, 
-            false, // isRequired (Normalmente false para que se puedan mover)
-            () -> new FolderResources(id, path, false), // ResourcesSupplier
-            Component.literal(name), 
-            FOLDER_DESCRIPTION, 
-            PackCompatibility.COMPATIBLE, 
+            net.minecraft.network.chat.Component.literal(id), 
+            false, 
+            (name) -> new net.minecraft.server.packs.PathPackResources(name, path, false), 
+            PackType.CLIENT_RESOURCES, 
             Pack.Position.TOP, 
-            false, // fixedPosition
-            PackUtil.PACK_SOURCE
+            net.minecraft.server.packs.repository.PackSource.DEFAULT
         );
-        this.nestedPacksProvider = nestedPacksProvider;
-        this.path = path;
-    }
-
-    public List<Pack> flatten() {
-        List<Pack> result = new ObjectArrayList<>();
-        result.add(this);
-        List<Pack> nested = this.nestedPacksProvider.apply(this);
-        if (nested != null) {
-            result.addAll(nested);
-        }
-        return result;
-    }
-
-    public CompletableFuture<Folder> loadConfig() {
-        return CompletableFuture.supplyAsync(() -> {
-            try (PackResources resources = this.open()) {
-                // En 1.20.1 se usa getRootResource directamente
-                var configIoSupplier = resources.getRootResource(FolderResources.FOLDER_CONFIG_FILENAME);
-                if (configIoSupplier == null) throw new IOException();
-                
-                try (InputStream inputStream = configIoSupplier.get()) {
-                    return JsonLoader.loadJson(inputStream, Folder.class);
-                }
-            } catch (Exception e) {
-                return new Folder();
-            }
-        }, Util.backgroundExecutor());
-    }
-
-    public void saveConfig(Folder folder) {
-        if (folder != null) {
-            folder.save(this.path.resolve(FolderResources.FOLDER_CONFIG_FILENAME));
-        }
-    }
-
-    @Override
-    public @Nullable Path packed_packs$getPath() {
-        return this.path;
     }
 }
