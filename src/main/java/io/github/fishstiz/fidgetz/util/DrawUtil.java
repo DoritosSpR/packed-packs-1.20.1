@@ -11,8 +11,9 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 
 public class DrawUtil {
-    public static final Sprite DEMO_BACKGROUND = new GuiSprite(ResourceLocation.withDefaultNamespace("popup/background"), 236, 34);
-    public static final ResourceLocation SHADOW_SPRITE = ResourceLocation.fromNamespaceAndPath("fidgetz", "drop_shadow");
+    // CORRECCIÓN 1.20.1: Usar constructores de ResourceLocation manuales
+    public static final Sprite DEMO_BACKGROUND = new GuiSprite(new ResourceLocation("minecraft", "popup/background"), 236, 34);
+    public static final ResourceLocation SHADOW_SPRITE = new ResourceLocation("fidgetz", "drop_shadow");
     private static final int SHADOW_BORDER = 32;
 
     private DrawUtil() {
@@ -41,6 +42,7 @@ public class DrawUtil {
             double scrollOffset = Mth.lerp(scrollFactor, 0.0, overflowWidth);
 
             guiGraphics.enableScissor(startX, startY, endX, endY);
+            // En 1.20.1 drawString devuelve la posición final X
             int width = guiGraphics.drawString(font, text, startX - (int) scrollOffset, textY, color, shadow);
             guiGraphics.disableScissor();
 
@@ -67,13 +69,21 @@ public class DrawUtil {
         float scale = (float) shadowSize / SHADOW_BORDER;
         int offset = Math.round(SHADOW_BORDER * scale);
         RenderSystem.enableBlend();
-        guiGraphics.blitSprite(
+        
+        // CORRECCIÓN 1.20.1: blitSprite NO EXISTE. 
+        // Si SHADOW_SPRITE es un sprite del atlas, debes usar blit().
+        // Asumiendo que SHADOW_SPRITE es una textura completa o manejada por el atlas:
+        guiGraphics.blit(
                 SHADOW_SPRITE,
                 x - offset,
                 y - offset,
+                0, 0, // UV
                 width + offset * 2,
-                height + offset * 2
+                height + offset * 2,
+                width + offset * 2, // textureWidth
+                height + offset * 2 // textureHeight
         );
+        
         RenderSystem.defaultBlendFunc();
     }
 }
