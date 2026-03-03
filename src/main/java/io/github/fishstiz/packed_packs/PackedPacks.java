@@ -1,31 +1,18 @@
 package io.github.fishstiz.packed_packs;
 
+import io.github.fishstiz.packed_packs.impl.PackedPacksApiImpl;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.fml.loading.FMLPaths;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.nio.file.Path;
-
-@Mod(PackedPacks.MOD_ID) // <--- ESTO ES LO QUE BUSCÁBAMOS
+@Mod("packed_packs")
 public class PackedPacks {
-    public static final String MOD_ID = "packed_packs";
-    public static final String MOD_NAME = "Packed Packs";
-    public static final Logger LOGGER = LoggerFactory.getLogger(MOD_NAME);
-
     public PackedPacks() {
-        IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
-
-        // Esto fuerza la carga del API y congela los registros
-        PackedPacksApiImpl.getInstance();
-
-        LOGGER.info("Packed Packs 1.20.1: Sistema de preferencias y eventos activado.");
+        FMLJavaModLoadingContext.get().getModEventBus().addListener(this::setup);
     }
-    
-    public static Path getConfigDir() {
-        // En Forge 1.20.1 usamos FMLPaths para obtener la carpeta de config directamente
-        return FMLPaths.CONFIGDIR.get().resolve(MOD_ID);
+
+    private void setup(final FMLCommonSetupEvent event) {
+        // Ahora el símbolo es visible gracias al import
+        PackedPacksApiImpl.getInstance();
     }
 }
