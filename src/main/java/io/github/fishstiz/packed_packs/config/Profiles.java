@@ -1,28 +1,19 @@
 package io.github.fishstiz.packed_packs.config;
 
-import io.github.fishstiz.packed_packs.util.JsonLoader;
-import java.nio.file.Path;
-import java.io.Serializable;
-import java.util.function.Supplier;
+import net.minecraft.server.packs.PackType;
+import java.util.HashMap;
+import java.util.Map;
 
 public class Profiles {
-    public static final String PROFILE_EXTENSION = ".json";
+    private static final Map<PackType, Map<String, Profile>> CACHE = new HashMap<>();
 
-    public static <T extends Serializable> T loadJsonOrDefault(Path path, Class<T> clazz, Supplier<T> defaultValue) {
-        T result = JsonLoader.load(path, clazz);
-        return result != null ? result : defaultValue.get();
+    public static Profile get(PackType type, String id) {
+        if (id == null) return null;
+        return CACHE.computeIfAbsent(type, k -> new HashMap<>()).get(id);
     }
 
-    public static String toId(Path path) {
-        return removeExtension(path.getFileName().toString());
-    }
-
-    public static String removeExtension(String fileName) {
-        int lastDot = fileName.lastIndexOf('.');
-        return (lastDot > 0) ? fileName.substring(0, lastDot) : fileName;
-    }
-
-    public static Path getFile(Path saveFolder, String id) {
-        return saveFolder.resolve(id + PROFILE_EXTENSION);
+    public static void save(PackType type, Profile profile) {
+        CACHE.computeIfAbsent(type, k -> new HashMap<>()).put(profile.getName(), profile);
+        // Aquí iría la lógica de guardado a disco real
     }
 }
