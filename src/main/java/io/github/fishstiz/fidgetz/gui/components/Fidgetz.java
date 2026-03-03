@@ -1,27 +1,16 @@
 package io.github.fishstiz.fidgetz.gui.components;
 
-import io.github.fishstiz.fidgetz.gui.shapes.GuiRectangle;
-import net.minecraft.client.gui.components.events.GuiEventListener;
-import net.minecraft.client.gui.layouts.LayoutElement;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
+import io.github.fishstiz.fidgetz.gui.util.GuiRectangle;
 
-public interface Fidgetz extends GuiEventListener, LayoutElement {
+public class Fidgetz {
     
-    @Override
-    default ScreenRectangle getRectangle() {
-        GuiRectangle rect = getViewRectangle();
-        return new ScreenRectangle(rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight());
+    /**
+     * Convierte un GuiRectangle de Fidgetz a un ScreenRectangle de Minecraft.
+     */
+    public static ScreenRectangle getScreenRectangle(GuiRectangle rect) {
+        // En 1.20.1 los métodos de GuiRectangle suelen ser left(), top(), width() y height()
+        // o x(), y(), width(), height() dependiendo de tu implementación de Fidgetz.
+        return new ScreenRectangle(rect.x(), rect.y(), rect.width(), rect.height());
     }
-
-    GuiRectangle getViewRectangle();
-
-    @Override
-    default boolean isMouseOver(double mouseX, double mouseY) {
-        return getViewRectangle().containsPoint(mouseX, mouseY);
-    }
-
-    @Override int getX();
-    @Override int getY();
-    @Override int getWidth();
-    @Override int getHeight();
 }
