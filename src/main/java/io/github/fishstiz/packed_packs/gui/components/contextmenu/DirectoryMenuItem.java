@@ -1,18 +1,18 @@
 package io.github.fishstiz.packed_packs.gui.components.contextmenu;
 
-import io.github.fishstiz.fidgetz.gui.components.contextmenu.MenuItem;
 import net.minecraft.Util;
-import net.minecraft.network.chat.Component;
-
 import java.nio.file.Path;
+import java.io.File;
 
-public record DirectoryMenuItem(Path directory, Component text) implements MenuItem {
-    public DirectoryMenuItem(Path directory) {
-        this(directory, Component.literal(directory.getFileName().toString()));
+public class DirectoryMenuItem {
+    private final File directory;
+
+    public DirectoryMenuItem(Path path) {
+        this.directory = path.toFile();
     }
 
-    @Override
-    public void run() {
-        Util.getPlatform().openPath(this.directory);
+    public void onClick() {
+        // Util.getPlatform().openFile es el método correcto para 1.20.1
+        Util.getPlatform().openFile(this.directory);
     }
 }
