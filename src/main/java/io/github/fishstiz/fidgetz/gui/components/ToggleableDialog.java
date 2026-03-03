@@ -1,33 +1,42 @@
 package io.github.fishstiz.fidgetz.gui.components;
 
+import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.layouts.Layout;
+import net.minecraft.client.gui.screens.Screen;
 
-public abstract class ToggleableDialog<T extends ToggleableDialog<T>> {
-    private float zIndex = 0;
-    private boolean captureClick = true;
-    private boolean captureFocus = true;
+public abstract class ToggleableDialog<L extends Layout> implements Renderable, GuiEventListener {
+    protected final Screen screen;
+    protected final L root;
+    private boolean open = false;
+    protected int background = 0;
 
-    public float getZ() { return zIndex; }
-    public void setZ(float z) { this.zIndex = z; }
-
-    public boolean isCaptureClick() { return captureClick; }
-    public boolean isCaptureFocus() { return captureFocus; }
-
-    public boolean encloses(GuiEventListener child) {
-        return false;
+    protected ToggleableDialog(Builder<L, ?> builder) {
+        this.screen = builder.screen;
+        this.root = builder.root;
+        this.background = builder.background;
     }
 
-    // AÑADIR ESTA CLASE INTERNA
+    public L root() { return root; }
+    public boolean isOpen() { return open; }
+    public void setOpen(boolean open) { this.open = open; }
+
     public static abstract class Builder<L extends Layout, B extends Builder<L, B>> {
-        protected float zIndex = 0;
+        protected final Screen screen;
+        protected final L root;
+        protected int background = 0;
+
+        public Builder(Screen screen, L root) {
+            this.screen = screen;
+            this.root = root;
+        }
 
         @SuppressWarnings("unchecked")
-        public B setZ(float z) {
-            this.zIndex = z;
+        public B background(int color) {
+            this.background = color;
             return (B) this;
         }
 
-        // Aquí irían los métodos comunes para construir diálogos
+        public abstract ToggleableDialog<L> build();
     }
 }
