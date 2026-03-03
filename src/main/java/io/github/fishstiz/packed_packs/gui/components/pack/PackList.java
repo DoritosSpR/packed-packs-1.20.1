@@ -7,6 +7,7 @@ import io.github.fishstiz.packed_packs.pack.PackFileOperations;
 import io.github.fishstiz.packed_packs.pack.PackOptionsContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.ObjectSelectionList;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.packs.repository.Pack;
 import java.util.List;
 
@@ -18,24 +19,19 @@ public abstract class PackList extends ObjectSelectionList<PackList.Entry> imple
     protected int headerHeight = 0;
     public int scrollbarOffset = 6;
 
-    public PackList(PackOptionsContext options, PackAssetManager assets, PackFileOperations fileOps, PackListEventListener listener) {
-        // Minecraft 1.20.1: Minecraft, width, height, y0 (top), y1 (bottom), itemHeight
-        super(Minecraft.getInstance(), 200, 200, 32, 200 - 32, 36);
+    public PackList(Minecraft minecraft, int width, int height, int top, int bottom, int itemHeight, 
+                    PackOptionsContext options, PackAssetManager assets, PackFileOperations fileOps, PackListEventListener listener) {
+        super(minecraft, width, height, top, bottom, itemHeight);
         this.options = options;
         this.assets = assets;
         this.fileOps = fileOps;
         this.listener = listener;
     }
 
-    // Métodos de compatibilidad Fidgetz -> 1.20.1
     @Override public int getX() { return this.x0; }
     @Override public int getY() { return this.y0; }
     @Override public int getWidth() { return this.width; }
     @Override public int getHeight() { return this.height; }
-
-    public boolean scrollbarVisible() {
-        return this.getMaxScroll() > 0;
-    }
 
     public abstract boolean isTransferable(Pack pack);
     public abstract void removeAll(List<Pack> packs);
@@ -51,9 +47,11 @@ public abstract class PackList extends ObjectSelectionList<PackList.Entry> imple
         public abstract boolean isSelectedLast();
         public abstract boolean isTransferable();
         public abstract void transfer();
+        // Añadido para resolver el error de "cannot find symbol onRename"
+        public abstract void onRename(Component newName);
         protected abstract void sendPacks(Pack trigger, List<Pack> required);
 
-        @Override public int getX() { return 0; } // Se calcula en el render del hijo
+        @Override public int getX() { return 0; } 
         @Override public int getY() { return 0; } 
         @Override public int getWidth() { return 0; }
         @Override public int getHeight() { return 36; }
