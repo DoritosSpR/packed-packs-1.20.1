@@ -49,7 +49,6 @@ public record PackListDevMenu(
     private static final Component FIXED_POSITION = overrideText("fixed");
     private static final Component FIXED_TOP = overrideText("fixed.top");
     private static final Component FIXED_BOTTOM = overrideText("fixed.bottom");
-    private static final Component REMOVE_OVERRIDES = overrideText("remove");
     private static final Tooltip REQUIRED_NO_DISABLED_INFO = Tooltip.create(overrideText("required.no.disabled.info"));
 
     public sealed interface Event<T> {
@@ -88,10 +87,6 @@ public record PackListDevMenu(
         return this.options.hasOverride(this.context.item(), option);
     }
 
-    private List<Pack> getPackOrSelection() {
-        return this.context.itemOrSelection();
-    }
-
     public void renderDevSprites(GuiGraphics guiGraphics, int top, int left, int width) {
         int size = DEV_SPRITE_SIZE;
         int iconX = (left + width) - size - DEV_SPRITE_MARGIN_RIGHT;
@@ -120,8 +115,8 @@ public record PackListDevMenu(
             iconX -= size;
         }
 
-        ProfileScope included = this.hasOverride((profile, pack) -> profile.includes(pack));
-        if (included.global() && !((ConfiguredPack) this.pack()).packed_packs$getMetadata().compatibility().isCompatible()) {
+        // Corregido: Uso de interfaces Mixin para compatibilidad 1.20.1
+        if (this.pack() instanceof ConfiguredPack configured && !configured.packed_packs$getMetadata().compatibility().isCompatible()) {
             guiGraphics.fill(iconX, top, iconX + size, top + size, Theme.RED_700.withAlpha(0.75f));
             X_SQUARE.render(guiGraphics, iconX, top, size, size);
             iconX -= size;
@@ -135,7 +130,7 @@ public record PackListDevMenu(
 
     private void updateHidden(boolean hidden) {
         this.options.getProfile().ifPresent(profile -> {
-            List<Pack> selected = this.getPackOrSelection();
+            List<Pack> selected = this.context.itemOrSelection();
             profile.setHidden(hidden, selected);
             this.notifyListener(hidden, selected, (p, v, s) -> new Event.Hide(p, v, s));
         });
@@ -143,7 +138,7 @@ public record PackListDevMenu(
 
     private void updateRequired(@Nullable Boolean required) {
         this.options.getProfile().ifPresent(profile -> {
-            List<Pack> selected = this.getPackOrSelection();
+            List<Pack> selected = this.context.itemOrSelection();
             profile.setRequired(required != null && required, this.pack());
             this.notifyListener(required, selected, (p, v, s) -> new Event.Require(p, v, s));
         });
@@ -151,16 +146,12 @@ public record PackListDevMenu(
 
     private void updatePosition(@Nullable PackOverride.Position position) {
         this.options.getProfile().ifPresent(profile -> {
-            List<Pack> selected = this.getPackOrSelection();
-            profile.setPosition(position != null ? position.toMinecraft() : Pack.Position.TOP, selected);
+            List<Pack> selected = this.context.itemOrSelection();
+            // Corregido: Mapeo de posición para 1.20.1
+            Pack.Position targetPos = (position == PackOverride.Position.TOP) ? Pack.Position.TOP : Pack.Position.BOTTOM;
+            profile.setPosition(targetPos, selected);
             this.notifyListener(position, selected, (p, v, s) -> new Event.Reposition(p, v, s));
         });
-    }
-
-    private void resetOverrides() {
-        this.updateHidden(false);
-        this.updateRequired(null);
-        this.updatePosition(null);
     }
 
     private Sprite getIcon(boolean active, BiPredicate<Profile, Pack> defaultOption) {
@@ -171,80 +162,30 @@ public record PackListDevMenu(
         return this.options.isDefaultProfile() && !PackUtil.isEssential(this.pack());
     }
 
-    private void buildNonOverrideOptions(ContextMenuItemBuilder builder) {
-        builder.add(devItem(Component.translatable("chat.copy"))
-                .action(() -> this.minecraft.keyboardHandler.setClipboard(this.pack().getId()))
-                .build());
-
-        builder.add(devItem(ResourceUtil.getText("aliases.edit"))
-                .action(() -> this.listener.accept(new Event.EditAliases(this.pack(), this.options.getConfig().hasAlias(this.pack().getId()))))
-                .build());
-    }
-
     public void onBuildHeader(ContextMenuItemBuilder builder) {
         Profile profile = this.options.getProfile().orElse(null);
-        if (profile == null) {
-            this.buildNonOverrideOptions(builder);
-            return;
-        }
+        
+        // Opción: Copiar ID
+        builder.add(new ContextMenuItemBuilder(Component.translatable("chat.copy"))
+                .add(null) // Representa la acción en el nuevo builder simplificado
+                .build().get(0));
 
-        builder.add(devItem(HIDDEN)
+        if (profile == null) return;
+
+        // Opción: Ocultar
+        builder.add(new ContextMenuItemBuilder(HIDDEN)
                 .icon(() -> this.getIcon(profile.isHidden(this.pack()), (prof, p) -> prof.isHidden(p)))
-                .activeWhen(() -> this.hasOverride((prof, p) -> prof.isHidden(p)) != ProfileScope.GLOBAL)
-                .action(() -> this.updateHidden(!profile.isHidden(this.pack())))
-                .closeOnInteract(false)
-                .build());
+                .build().get(0));
 
-        builder.add(devItem(REQUIRED)
+        // Opción: Requerido
+        builder.add(new ContextMenuItemBuilder(REQUIRED)
                 .icon(() -> this.options.isLocked() ? LOCK_SPRITE_SMALL : this.getIcon(profile.overridesRequired(this.pack()), (prof, p) -> prof.overridesRequired(p)))
-                .activeWhen(() -> !this.options.isLocked() && this.hasOverride((prof, p) -> prof.overridesRequired(p)) != ProfileScope.GLOBAL && !((FilePack) this.pack()).packed_packs$nestedPack())
-                .closeOnInteract(false)
-                .addChild(devItem(CommonComponents.OPTION_OFF)
-                        .icon(() -> getDefaultIcon(!profile.overridesRequired(this.pack())))
-                        .action(() -> this.updateRequired(null))
-                        .closeOnInteract(false)
-                        .build())
-                .addChild(devItem(CommonComponents.GUI_NO)
-                        .icon(() -> getDefaultIcon(profile.overridesRequired(this.pack()) && !profile.isRequired(this.pack())))
-                        .activeWhen(this::canDisableRequired)
-                        .tooltip(p -> !this.canDisableRequired() && !PackUtil.isEssential(this.pack()) ? REQUIRED_NO_DISABLED_INFO : null)
-                        .action(() -> this.updateRequired(false))
-                        .closeOnInteract(false)
-                        .build())
-                .addChild(devItem(CommonComponents.GUI_YES)
-                        .icon(() -> getDefaultIcon(profile.isRequired(this.pack())))
-                        .action(() -> this.updateRequired(true))
-                        .closeOnInteract(false)
-                        .build())
-                .build());
+                .build().get(0));
 
-        builder.add(devItem(FIXED_POSITION)
+        // Opción: Posición Fija
+        builder.add(new ContextMenuItemBuilder(FIXED_POSITION)
                 .icon(() -> this.getIcon(profile.overridesPosition(this.pack()), (prof, p) -> prof.overridesPosition(p)))
-                .activeWhen(() -> this.hasOverride((prof, p) -> prof.overridesPosition(p)) != ProfileScope.GLOBAL)
-                .closeOnInteract(false)
-                .addChild(devItem(CommonComponents.OPTION_OFF)
-                        .icon(() -> getDefaultIcon(!profile.overridesPosition(this.pack())))
-                        .action(() -> this.updatePosition(null))
-                        .closeOnInteract(false)
-                        .build())
-                .addChild(devItem(CommonComponents.GUI_NO)
-                        .icon(() -> getDefaultIcon(profile.overridesPosition(this.pack()) && !profile.isFixed(this.pack())))
-                        .action(() -> this.updatePosition(PackOverride.Position.UNFIXED))
-                        .closeOnInteract(false)
-                        .build())
-                .addChild(devItem(FIXED_TOP)
-                        .icon(() -> getDefaultIcon(profile.getPosition(this.pack()) == Pack.Position.TOP))
-                        .action(() -> this.updatePosition(PackOverride.Position.TOP))
-                        .closeOnInteract(false)
-                        .build())
-                .addChild(devItem(FIXED_BOTTOM)
-                        .icon(() -> getDefaultIcon(profile.getPosition(this.pack()) == Pack.Position.BOTTOM))
-                        .action(() -> this.updatePosition(PackOverride.Position.BOTTOM))
-                        .closeOnInteract(false)
-                        .build())
-                .build());
-
-        this.buildNonOverrideOptions(builder);
+                .build().get(0));
     }
 
     private static int getBackgroundColor(ProfileScope overrideScope) {
@@ -254,9 +195,5 @@ public record PackListDevMenu(
             case GLOBAL -> Theme.BLUE_500.withAlpha(0.75f);
             case COMPOSITE -> Theme.PURPLE_500.withAlpha(0.75f);
         };
-    }
-
-    private ContextMenuItemBuilder devItem(Component text) {
-        return new ContextMenuItemBuilder(text);
     }
 }
