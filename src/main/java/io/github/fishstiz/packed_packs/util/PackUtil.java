@@ -1,28 +1,25 @@
 package io.github.fishstiz.packed_packs.util;
 
-import io.github.fishstiz.packed_packs.pack.folder.FolderPack;
-import io.github.fishstiz.packed_packs.pack.folder.FolderResources;
-import io.github.fishstiz.packed_packs.transform.interfaces.FilePack;
-import io.github.fishstiz.fidgetz.util.lang.CollectionsUtil;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
-import net.minecraft.ChatFormatting;
-import net.minecraft.Util;
-import net.minecraft.network.chat.Component;
+import io.github.fishstiz.packed_packs.pack.FolderPack;
 import net.minecraft.server.packs.repository.Pack;
-import net.minecraft.server.packs.repository.PackSource;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.*;
-import java.util.*;
-import java.util.stream.Stream;
+import java.util.ArrayList;
+import java.util.List;
 
 public class PackUtil {
-    public static final String HIGH_CONTRAST_ID = "high_contrast";
-    public static final String VANILLA_ID = "vanilla";
-    public static final String ZIP_PACK_EXTENSION = ".zip";
-    public static final String ICON_FILENAME = "pack.png";
+    
+    public static List<Pack> flattenPacks(List<Pack> packs) {
+        List<Pack> flattened = new ArrayList<>();
+        for (Pack pack : packs) {
+            // Cambio clave: Casting tradicional para evitar errores de compilador en 1.20.1
+            if (pack instanceof FolderPack) {
+                FolderPack folderPack = (FolderPack) pack;
+                flattened.addAll(folderPack.flatten());
+            } else {
+                flattened.add(pack);
+            }
+        }
+        return flattened;
+    }
     
     // En 1.20.1 PackSource.create recibe un decorador de nombre y un booleano (si es fijo)
     public static final PackSource PACK_SOURCE = PackSource.create(name -> 
