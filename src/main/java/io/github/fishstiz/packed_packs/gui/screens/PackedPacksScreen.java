@@ -26,7 +26,7 @@ import io.github.fishstiz.packed_packs.transform.mixin.PackSelectionModelAccesso
 import io.github.fishstiz.packed_packs.util.AsyncUtil;
 import io.github.fishstiz.packed_packs.util.ToastUtil;
 import io.github.fishstiz.packed_packs.util.constants.Theme;
-import io.github.fishstiz.packed_packs.pack.folder.FolderPack;
+import io.github.fishstiz.packed_packs.pack.FolderPack;
 import io.github.fishstiz.packed_packs.gui.layouts.*;
 import io.github.fishstiz.packed_packs.gui.components.events.*;
 import io.github.fishstiz.packed_packs.gui.history.HistoryManager;
