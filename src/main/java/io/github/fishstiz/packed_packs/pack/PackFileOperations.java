@@ -1,8 +1,6 @@
 package io.github.fishstiz.packed_packs.pack;
 
 import io.github.fishstiz.packed_packs.config.Folder;
-import io.github.fishstiz.packed_packs.pack.FolderPack;
-import io.github.fishstiz.packed_packs.pack.FolderResources;
 import io.github.fishstiz.packed_packs.transform.interfaces.FilePack;
 import io.github.fishstiz.packed_packs.util.PackUtil;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -26,15 +24,12 @@ public class PackFileOperations {
                !this.options.isFixed(pack) &&
                !this.options.isRequired(pack) &&
                !this.options.isLocked() &&
-               !this.repository.isEnabled(pack) &&
+               this.repository.getSelection().getStatus(pack).canDisallow() && // Reemplazo de isEnabled
                ((FilePack) pack).packed_packs$getPath() != null;
     }
 
-    // I wouldn't have had to do this if the nested pack ids weren't modified,
-    // but reverting this would be a breaking change. Oops.
-    // If a folder pack is renamed outside here, the config won't be remapped.
     private void remapFolderConfig(FolderPack folderPack, String name, Path path) {
-        Folder folder = this.repository.getFolderConfig(folderPack);
+        Folder folder = folderPack.getFolderConfig(); // Acceso directo desde el FolderPack
         if (folder == null) return;
 
         String newId = PackUtil.generatePackId(name);
@@ -51,7 +46,8 @@ public class PackFileOperations {
         }
 
         folder.trySetPackIds(newPackIds);
-        folder.save(path.resolve(FolderResources.FOLDER_CONFIG_FILENAME));
+        // Usando el nombre de archivo estándar de configuración de carpetas
+        folder.save(path.resolve("packed_packs_folder.json")); 
     }
 
     public boolean renamePack(Pack pack, String name) {
