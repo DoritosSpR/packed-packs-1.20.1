@@ -1,34 +1,40 @@
 package io.github.fishstiz.packed_packs.gui.components.pack;
 
-import io.github.fishstiz.fidgetz.gui.components.AbstractFixedListWidget;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.ContainerObjectSelectionList;
+import io.github.fishstiz.packed_packs.gui.components.events.PackListEventListener;
+import io.github.fishstiz.packed_packs.pack.PackAssetManager;
+import io.github.fishstiz.packed_packs.pack.PackFileOperations;
+import io.github.fishstiz.packed_packs.pack.PackOptionsContext;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.server.packs.repository.Pack;
 
-public abstract class PackList extends AbstractFixedListWidget<PackList.Entry> {
-    protected final int itemHeight;
+public abstract class PackList extends ObjectSelectionList<PackList.Entry> {
+    protected final PackOptionsContext options;
+    protected final PackAssetManager assets;
+    protected final PackFileOperations fileOps;
+    protected final PackListEventListener listener;
+    protected int headerHeight = 0;
 
-    public PackList(int width, int height, int top, int bottom, int itemHeight) {
-        super(width, height, top, bottom, itemHeight);
-        this.itemHeight = itemHeight;
+    public PackList(PackOptionsContext options, PackAssetManager assets, PackFileOperations fileOps, PackListEventListener listener) {
+        // Constructor de Minecraft 1.20.1: width, height, y0, y1, itemHeight
+        super(Minecraft.getInstance(), 200, 200, 32, 200 - 32, 36);
+        this.options = options;
+        this.assets = assets;
+        this.fileOps = fileOps;
+        this.listener = listener;
     }
 
-    public Entry getEntry(Pack pack) {
-        for (Entry entry : this.children()) {
-            if (entry.pack().equals(pack)) return entry;
-        }
-        return null;
+    public int getRowTop(int index) {
+        return this.getY() + 4 - (int)this.getScrollAmount() + index * this.itemHeight + this.headerHeight;
     }
 
-    public int getRowIndex(double mouseY) {
-        // Usamos getY() en lugar de this.top
+    protected int getIndexAt(double mouseX, double mouseY) {
         return (int)((mouseY - (double)this.getY() + this.getScrollAmount() - (double)this.headerHeight) / (double)this.itemHeight);
     }
 
-    public abstract class Entry extends ContainerObjectSelectionList.Entry<Entry> {
-        protected final int index;
-        public Entry(int index) { this.index = index; }
+    public abstract static class Entry extends ObjectSelectionList.Entry<Entry> {
         public abstract Pack pack();
-        @Override public abstract void render(GuiGraphics g, int index, int top, int left, int width, int height, int mouseX, int mouseY, boolean isHovered, float partialTick);
+        public abstract int getY();
+        public abstract int getHeight();
     }
 }
