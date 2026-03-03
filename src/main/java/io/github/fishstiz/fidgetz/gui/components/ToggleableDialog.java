@@ -1,6 +1,7 @@
 package io.github.fishstiz.fidgetz.gui.components;
 
 import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.layouts.Layout;
 
 public abstract class ToggleableDialog<T extends ToggleableDialog<T>> {
     private float zIndex = 0;
@@ -14,7 +15,19 @@ public abstract class ToggleableDialog<T extends ToggleableDialog<T>> {
     public boolean isCaptureFocus() { return captureFocus; }
 
     public boolean encloses(GuiEventListener child) {
-        // Lógica para detectar si un elemento está dentro del diálogo
         return false;
+    }
+
+    // AÑADIR ESTA CLASE INTERNA
+    public static abstract class Builder<L extends Layout, B extends Builder<L, B>> {
+        protected float zIndex = 0;
+
+        @SuppressWarnings("unchecked")
+        public B setZ(float z) {
+            this.zIndex = z;
+            return (B) this;
+        }
+
+        // Aquí irían los métodos comunes para construir diálogos
     }
 }
