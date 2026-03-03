@@ -5,11 +5,11 @@ import java.util.Objects;
 
 public record SelectionContext<T>(List<T> selection, T item) {
     public boolean isSelectedLast() {
-        if (this.selection == null || this.selection.isEmpty()) {
-            return false;
-        }
-        // CORRECCIÓN: Uso de size() - 1 para compatibilidad con Java 17
-        T lastElement = this.selection.get(this.selection.size() - 1);
-        return Objects.equals(lastElement, this.item);
+        if (this.selection == null || this.selection.isEmpty()) return false;
+        return Objects.equals(this.selection.get(this.selection.size() - 1), this.item);
+    }
+
+    public boolean isSelected() {
+        return this.selection != null && this.selection.contains(this.item);
     }
 }
