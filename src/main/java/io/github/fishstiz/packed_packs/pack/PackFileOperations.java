@@ -1,8 +1,8 @@
 package io.github.fishstiz.packed_packs.pack;
 
 import io.github.fishstiz.packed_packs.config.Folder;
-import io.github.fishstiz.packed_packs.pack.folder.FolderPack;
-import io.github.fishstiz.packed_packs.pack.folder.FolderResources;
+import io.github.fishstiz.packed_packs.pack.FolderPack;
+import io.github.fishstiz.packed_packs.pack.FolderResources;
 import io.github.fishstiz.packed_packs.transform.interfaces.FilePack;
 import io.github.fishstiz.packed_packs.util.PackUtil;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
