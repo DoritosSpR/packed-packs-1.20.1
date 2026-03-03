@@ -1,6 +1,5 @@
 package io.github.fishstiz.fidgetz.gui.components;
 
-import io.github.fishstiz.fidgetz.gui.shapes.GuiRectangle;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
 
@@ -10,19 +9,23 @@ public abstract class FidgetzButton<E> extends Button implements Fidgetz {
         super(x, y, width, height, message, onPress, createNarration);
     }
 
-    @Override
-    public int getX() { return this.getX(); }
+    // Definición correcta del Builder genérico para que las subclases no fallen
+    public static abstract class Builder<E, T extends Builder<E, T>> {
+        protected Component message = Component.empty();
+        protected OnPress onPress = (btn) -> {};
 
-    @Override
-    public int getY() { return this.getY(); }
+        @SuppressWarnings("unchecked")
+        public T message(Component message) {
+            this.message = message;
+            return (T) this;
+        }
 
-    @Override
-    public int getWidth() { return this.width; }
+        @SuppressWarnings("unchecked")
+        public T onPress(OnPress onPress) {
+            this.onPress = onPress;
+            return (T) this;
+        }
 
-    @Override
-    public int getHeight() { return this.height; }
-
-    public GuiRectangle getViewRectangle() {
-        return new GuiRectangle(this.getX(), this.getY(), this.getWidth(), this.getHeight());
+        public abstract FidgetzButton<E> build();
     }
 }
