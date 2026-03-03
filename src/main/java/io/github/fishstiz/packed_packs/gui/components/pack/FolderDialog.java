@@ -16,24 +16,23 @@ import io.github.fishstiz.packed_packs.transform.interfaces.FilePack;
 import io.github.fishstiz.packed_packs.util.PackUtil;
 import io.github.fishstiz.fidgetz.util.lang.ObjectsUtil;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.packs.repository.Pack;
 import org.jetbrains.annotations.Nullable;
 
 import static io.github.fishstiz.packed_packs.util.constants.GuiConstants.*;
 
-/**
- * Corregido para extender ToggleableDialog<FolderPackList>
- */
 public class FolderDialog extends ToggleableDialog<FolderPackList> implements ContextMenuContainer {
     private static final Component BACK_TEXT = CommonComponents.GUI_BACK.copy().append(CommonComponents.ELLIPSIS);
     private static final int HEADER_HEIGHT = 16;
+    
     private final FidgetzButton<Void> closeButton;
     private final FidgetzText<Void> folderTitle;
     private final PackFileOperations fileOps;
     private final PackListEventListener listener;
+    
     private Sprite folderSprite = PackAssetManager.DEFAULT_FOLDER_ICON;
     private PackList parent;
     private FolderPack folderPack;
@@ -44,60 +43,67 @@ public class FolderDialog extends ToggleableDialog<FolderPackList> implements Co
             PackAssetManager assets,
             PackFileOperations fileOps
     ) {
-        // Llamada corregida al builder estático de la clase base
+        // Corrección del Builder: Se asegura el tipo S para el screen
         super(ToggleableDialog.<FolderPackList, S>builder(screen, new FolderPackList(options, assets, fileOps, screen))
-                .setBackground(DrawUtil.DEMO_BACKGROUND));
+                .setBackground(DrawUtil.DEMO_BACKGROUND)
+                .build());
 
         this.listener = screen;
         this.fileOps = fileOps;
         
         // Inicialización de widgets manual
-        this.closeButton = this.addRenderableWidget(
-                FidgetzButton.<Void>builder()
-                        .setOnPress(() -> this.sendEvent(new FolderCloseEvent(this.root(), this.folderPack)))
-                        .makeSquare(CROSS_SPRITE.width)
-                        .spriteOnly()
-                        .build()
-        );
-        this.folderTitle = this.addRenderableWidget(
-                FidgetzText.<Void>builder()
-                        .setHeight(CROSS_SPRITE.height)
-                        .setOffsetY(1)
-                        .setShadow(true)
-                        .alignLeft()
-                        .build()
-        );
+        this.closeButton = FidgetzButton.<Void>builder()
+                .setOnPress(() -> this.setOpen(false)) // Simplificado para cerrar
+                .makeSquare(CROSS_SPRITE.width)
+                .spriteOnly()
+                .build();
+                
+        this.folderTitle = FidgetzText.<Void>builder()
+                .setHeight(CROSS_SPRITE.height)
+                .setOffsetY(1)
+                .setShadow(true)
+                .alignLeft()
+                .build();
 
-        this.root().visible = false;
-        this.addListener(open -> {
-            this.root().visible = open;
-            if (!open) this.sendEvent(new FolderCloseEvent(this.root(), this.folderPack));
-        });
+        // Registro de widgets para que reciban clicks y se rendericen
+        this.addRenderableWidget(this.closeButton);
+        this.addRenderableWidget(this.folderTitle);
+
+        this.getContent().visible = false;
         
-        // En 1.20.1 visitWidgets ayuda a registrar los sub-elementos para renderizado y eventos
-        this.root().visitWidgets(this::addRenderableWidget);
+        // Listener de apertura/cierre
+        this.addToggleListener(open -> {
+            this.getContent().visible = open;
+            if (!open && this.folderPack != null) {
+                this.sendEvent(new FolderCloseEvent(this.getContent(), this.folderPack));
+            }
+        });
+    }
+
+    /**
+     * En Fidgetz moderno, root() suele ser getContent()
+     */
+    public FolderPackList root() {
+        return this.getContent();
     }
 
     private void updateBounds() {
-        GuiRectangle bounds = this.getBoundingBox();
-        int parentX = bounds.getX();
-        int parentY = bounds.getY();
-        int parentWidth = bounds.getWidth();
-        int parentHeight = bounds.getHeight();
+        GuiRectangle bounds = this.getBounds(); // Fidgetz usa getBounds() habitualmente
+        int left = bounds.getX() + SPACING;
+        int top = bounds.getY() + SPACING;
 
-        int left = parentX + SPACING;
-        int top = parentY + SPACING;
-        int right = (parentX + parentWidth) - SPACING;
-        int bottom = (parentY + parentHeight) - SPACING;
-
-        // Reposicionamiento del contenido (la lista de packs de la carpeta)
-        this.root().setPosition(left, top + HEADER_HEIGHT + SPACING);
-        this.root().setWidth(right - left);
-        this.root().setHeight(bottom - this.root().getY());
+        // Reposicionamiento del contenido
+        this.root().setX(left);
+        this.root().setY(top + HEADER_HEIGHT + SPACING);
+        this.root().setWidth(bounds.getWidth() - (SPACING * 2));
+        this.root().setHeight(bounds.getBottom() - SPACING - this.root().getY());
         
-        this.closeButton.setPosition(left, top);
-        this.folderTitle.setPosition(left + this.closeButton.getWidth() + SPACING, top);
-        this.folderTitle.setWidth(bounds.getRight() - this.folderTitle.getX() - SPACING * 2);
+        this.closeButton.setX(left);
+        this.closeButton.setY(top);
+        
+        this.folderTitle.setX(left + this.closeButton.getWidth() + SPACING);
+        this.folderTitle.setY(top);
+        this.folderTitle.setWidth(bounds.getRight() - this.folderTitle.getX() - SPACING);
     }
 
     public void updateFolder(PackList parent, FolderPack folderPack, PackAssetManager assets) {
@@ -106,65 +112,59 @@ public class FolderDialog extends ToggleableDialog<FolderPackList> implements Co
         this.folderTitle.setMessage(folderPack.getTitle());
         assets.getOrLoadIcon(folderPack, icon -> this.folderSprite = icon);
 
-        this.setBoundingBox(parent);
+        // Alineamos el diálogo con la lista padre
+        this.setX(parent.getX());
+        this.setY(parent.getY());
+        this.setWidth(parent.getWidth());
+        this.setHeight(parent.getHeight());
+        
         this.updateBounds();
     }
 
     @Override
-    protected void renderBackground(GuiGraphics guiGraphics, int x, int y, int width, int height, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        if (!this.isOpen()) return;
         this.updateBounds();
-        super.renderBackground(guiGraphics, x, y, width, height, mouseX, mouseY, partialTick);
+        super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
 
     @Override
-    protected void renderForeground(GuiGraphics guiGraphics, int x, int y, int width, int height, int mouseX, int mouseY, float partialTick) {
+    protected void renderForeground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         int left = this.closeButton.getX();
         int top = this.closeButton.getY();
-        this.folderSprite.renderClamped(guiGraphics, left, top, CROSS_SPRITE.width, CROSS_SPRITE.height, partialTick);
+        
+        // Render del icono de la carpeta
+        this.folderSprite.render(guiGraphics, left, top, CROSS_SPRITE.width, CROSS_SPRITE.height);
 
-        if (this.closeButton.isHovered()) {
+        if (this.closeButton.isMouseOver(mouseX, mouseY)) {
             WHITE_OVERLAY.render(guiGraphics, left, top, CROSS_SPRITE.width, CROSS_SPRITE.height);
             CROSS_SPRITE.render(guiGraphics, left, top);
         }
     }
 
-    public @Nullable PackList getParent() {
-        return this.parent;
-    }
-
-    public @Nullable FolderPack getFolderPack() {
-        return this.folderPack;
-    }
-
     @Override
     public void buildItems(ContextMenuItemBuilder builder, int mouseX, int mouseY) {
-        ContextMenuItemBuilder rootMenu = builder.when(this.folderPack != null && this.isOpen());
-        
-        rootMenu.ifTrue(folderMenuBuilder -> {
-            folderMenuBuilder
-                    .add(new PackMenuHeader(this.folderPack, this.folderSprite))
-                    .simpleItem(BACK_TEXT, () -> this.setOpen(false));
+        if (this.folderPack == null || !this.isOpen()) return;
 
-            // Solo mostrar opciones de archivo si no se hace clic sobre un pack específico dentro de la carpeta
-            folderMenuBuilder.when(this.root().getChildAt(mouseX, mouseY).isEmpty())
-                    .ifTrue(b -> b
-                            .whenNonNull(ObjectsUtil.mapOrNull(this.folderPack, FilePack::packed_packs$getPath))
-                            .ifTrue((path, operationsMenuBuilder) -> operationsMenuBuilder
-                                    .separator()
-                                    .simpleItem(RENAME_FILE_TEXT, this::canOperateFolder, this::renameDirectory)
-                                    .simpleItem(DELETE_FILE_TEXT, this::canOperateFolder, this::deleteDirectory)
-                                    .simpleItem(OPEN_FILE_TEXT, () -> PackUtil.openPack(this.folderPack))
-                                    .simpleItem(OPEN_PARENT_TEXT, () -> PackUtil.openParent(this.folderPack))
-                            )
-                    );
-        });
-        
-        ContextMenuContainer.super.buildItems(builder, mouseX, mouseY);
+        builder.add(new PackMenuHeader(this.folderPack, this.folderSprite))
+               .simpleItem(BACK_TEXT, () -> this.setOpen(false));
+
+        // Solo mostrar opciones de carpeta si NO hay un pack bajo el ratón
+        if (this.root().getEntryAt(mouseX, mouseY) == null) {
+            builder.separator();
+            
+            if (this.canOperateFolder()) {
+                builder.simpleItem(RENAME_FILE_TEXT, this::renameDirectory)
+                       .simpleItem(DELETE_FILE_TEXT, this::deleteDirectory);
+            }
+            
+            builder.simpleItem(OPEN_FILE_TEXT, () -> PackUtil.openPack(this.folderPack))
+                   .simpleItem(OPEN_PARENT_TEXT, () -> PackUtil.openParent(this.folderPack));
+        }
     }
 
     private boolean canOperateFolder() {
-        return ObjectsUtil.testNullable(this.folderPack, this.fileOps::isOperable) &&
-               PackUtil.validatePackPath(this.folderPack) != null;
+        return this.folderPack != null && this.fileOps.isOperable(this.folderPack);
     }
 
     private void renameDirectory() {
@@ -174,7 +174,7 @@ public class FolderDialog extends ToggleableDialog<FolderPackList> implements Co
     }
 
     private void deleteDirectory() {
-        if (this.fileOps.deletePack(this.folderPack)) {
+        if (this.folderPack != null && this.fileOps.deletePack(this.folderPack)) {
             this.setOpen(false);
             if (this.parent != null) {
                 this.parent.remove(this.folderPack);
@@ -183,17 +183,13 @@ public class FolderDialog extends ToggleableDialog<FolderPackList> implements Co
         }
     }
 
-    public void onRename(Pack pack, Component newName) {
-        if (this.parent != null && pack == this.folderPack) {
-            PackList.Entry entry = this.parent.getEntry(this.folderPack);
-            if (entry != null) {
-                entry.onRename(newName);
-            }
-            this.setOpen(false);
-        }
-    }
-
     private void sendEvent(PackListEvent event) {
         this.listener.onEvent(event);
+    }
+
+    // Cumplir con la interfaz de Minecraft
+    @Override
+    public void setFocused(@Nullable GuiEventListener listener) {
+        super.setFocused(listener);
     }
 }
