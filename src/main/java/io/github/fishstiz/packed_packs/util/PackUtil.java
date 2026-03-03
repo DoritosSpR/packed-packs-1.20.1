@@ -37,15 +37,44 @@ public class PackUtil {
     public static boolean isFeature(Pack pack) {
         return pack.getId().startsWith("update_") || pack.getId().equals("bundle");
     }
+    
+    public static boolean isEssential(Pack pack) {
+        return isBuiltIn(pack) || pack.getId().equals(VANILLA_ID);
+    }
+
+    public static boolean hasMcmeta(Path path) {
+        return path != null && Files.isRegularFile(path.resolve("pack.mcmeta"));
+    }
+
+    public static boolean hasFolderConfig(Path path) {
+        return path != null && Files.exists(path.resolve(".folder_config.json"));
+    }
 
     public static Path validatePackPath(Pack pack) {
-        // En 1.20.1, si usas Forge, puedes intentar obtener la ruta del recurso
-        return null; // Retornar null evita crashes si no se encuentra
+        // En 1.20.1, para simplificar y evitar errores de casteo:
+        return null; 
+    }
+
+    public static boolean renamePath(Path source, Path target) {
+        try {
+            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     public static boolean deletePath(Path path) {
         try {
-            Files.deleteIfExists(path);
+            if (Files.isDirectory(path)) {
+                try (var stream = Files.walk(path)) {
+                    stream.sorted(Comparator.reverseOrder()).forEach(p -> {
+                        try { Files.delete(p); } catch (IOException ignored) {}
+                    });
+                }
+            } else {
+                Files.deleteIfExists(path);
+            }
             return true;
         } catch (IOException e) {
             return false;
@@ -54,13 +83,13 @@ public class PackUtil {
 
     public static void openPack(Pack pack) {
         Path path = validatePackPath(pack);
-        if (path != null) Util.getPlatform().openPath(path.toFile());
+        if (path != null) Util.getPlatform().openFile(path.toFile());
     }
 
     public static void openParent(Pack pack) {
         Path path = validatePackPath(pack);
         if (path != null && path.getParent() != null) {
-            Util.getPlatform().openPath(path.getParent().toFile());
+            Util.getPlatform().openFile(path.getParent().toFile());
         }
     }
 
