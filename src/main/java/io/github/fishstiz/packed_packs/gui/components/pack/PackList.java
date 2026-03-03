@@ -15,12 +15,23 @@ public abstract class PackList extends AbstractFixedListWidget<PackList.Entry> {
         this.itemHeight = itemHeight;
     }
 
-    public abstract class Entry extends ContainerObjectSelectionList.Entry<Entry> {
-        protected final int index;
+    // Dentro de tu clase PackList, asegúrate de que Entry tenga esto:
+public abstract class Entry extends ContainerObjectSelectionList.Entry<Entry> {
+    // ... (constructor y métodos anteriores)
 
-        public Entry(int index) {
-            this.index = index;
-        }
+    public abstract net.minecraft.server.packs.repository.Pack pack();
+
+    public boolean canOperateFile() {
+        return true; // O tu lógica de permisos
+    }
+
+    // Para 1.20.1, el sistema de widgets es diferente. 
+    // Si usas MixinExtras o una librería personalizada, asegúrate de que este método exista:
+    public <T extends net.minecraft.client.gui.components.events.GuiEventListener & net.minecraft.client.gui.components.Renderable> T addWidget(T widget) {
+        // Lógica para añadir el botón de hamburguesa/carpeta al renderizado de la línea
+        return widget;
+    }
+}
 
         @Override
         public abstract void render(GuiGraphics g, int index, int top, int left, int width, int height, int mouseX, int mouseY, boolean isHovered, float partialTick);
