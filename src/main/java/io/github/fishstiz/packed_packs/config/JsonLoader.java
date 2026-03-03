@@ -5,12 +5,10 @@ import com.google.gson.GsonBuilder;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import org.jetbrains.annotations.Nullable;
 
 public class JsonLoader {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
-    @Nullable
     public static <T> T load(Path path, Class<T> clazz) {
         if (!Files.exists(path)) return null;
         try (Reader reader = Files.newBufferedReader(path)) {
