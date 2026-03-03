@@ -24,6 +24,9 @@ import org.jetbrains.annotations.Nullable;
 
 import static io.github.fishstiz.packed_packs.util.constants.GuiConstants.*;
 
+/**
+ * Corregido para extender ToggleableDialog<FolderPackList>
+ */
 public class FolderDialog extends ToggleableDialog<FolderPackList> implements ContextMenuContainer {
     private static final Component BACK_TEXT = CommonComponents.GUI_BACK.copy().append(CommonComponents.ELLIPSIS);
     private static final int HEADER_HEIGHT = 16;
@@ -41,10 +44,14 @@ public class FolderDialog extends ToggleableDialog<FolderPackList> implements Co
             PackAssetManager assets,
             PackFileOperations fileOps
     ) {
-        super(builder(screen, new FolderPackList(options, assets, fileOps, screen)).setBackground(DrawUtil.DEMO_BACKGROUND));
+        // Llamada corregida al builder estático de la clase base
+        super(ToggleableDialog.<FolderPackList, S>builder(screen, new FolderPackList(options, assets, fileOps, screen))
+                .setBackground(DrawUtil.DEMO_BACKGROUND));
 
         this.listener = screen;
         this.fileOps = fileOps;
+        
+        // Inicialización de widgets manual
         this.closeButton = this.addRenderableWidget(
                 FidgetzButton.<Void>builder()
                         .setOnPress(() -> this.sendEvent(new FolderCloseEvent(this.root(), this.folderPack)))
@@ -66,6 +73,8 @@ public class FolderDialog extends ToggleableDialog<FolderPackList> implements Co
             this.root().visible = open;
             if (!open) this.sendEvent(new FolderCloseEvent(this.root(), this.folderPack));
         });
+        
+        // En 1.20.1 visitWidgets ayuda a registrar los sub-elementos para renderizado y eventos
         this.root().visitWidgets(this::addRenderableWidget);
     }
 
@@ -81,9 +90,11 @@ public class FolderDialog extends ToggleableDialog<FolderPackList> implements Co
         int right = (parentX + parentWidth) - SPACING;
         int bottom = (parentY + parentHeight) - SPACING;
 
+        // Reposicionamiento del contenido (la lista de packs de la carpeta)
         this.root().setPosition(left, top + HEADER_HEIGHT + SPACING);
         this.root().setWidth(right - left);
         this.root().setHeight(bottom - this.root().getY());
+        
         this.closeButton.setPosition(left, top);
         this.folderTitle.setPosition(left + this.closeButton.getWidth() + SPACING, top);
         this.folderTitle.setWidth(bounds.getRight() - this.folderTitle.getX() - SPACING * 2);
@@ -127,26 +138,28 @@ public class FolderDialog extends ToggleableDialog<FolderPackList> implements Co
 
     @Override
     public void buildItems(ContextMenuItemBuilder builder, int mouseX, int mouseY) {
-        ContextMenuContainer.super.buildItems(
-                builder.when(this.folderPack != null && this.isOpen())
-                        .ifTrue(folderMenuBuilder -> folderMenuBuilder
-                                .add(new PackMenuHeader(this.folderPack, this.folderSprite))
-                                .simpleItem(BACK_TEXT, () -> this.setOpen(false))
-                                .when(this.root().getChildAt(mouseX, mouseY).isEmpty())
-                                .ifTrue(b -> b
-                                        .whenNonNull(ObjectsUtil.mapOrNull(this.folderPack, FilePack::packed_packs$getPath))
-                                        .ifTrue((path, operationsMenuBuilder) -> operationsMenuBuilder
-                                                .separator()
-                                                .simpleItem(RENAME_FILE_TEXT, this::canOperateFolder, this::renameDirectory)
-                                                .simpleItem(DELETE_FILE_TEXT, this::canOperateFolder, this::deleteDirectory)
-                                                .simpleItem(OPEN_FILE_TEXT, () -> PackUtil.openPack(this.folderPack))
-                                                .simpleItem(OPEN_PARENT_TEXT, () -> PackUtil.openParent(this.folderPack))
-                                        )
-                                )
-                        ),
-                mouseX,
-                mouseY
-        );
+        ContextMenuItemBuilder rootMenu = builder.when(this.folderPack != null && this.isOpen());
+        
+        rootMenu.ifTrue(folderMenuBuilder -> {
+            folderMenuBuilder
+                    .add(new PackMenuHeader(this.folderPack, this.folderSprite))
+                    .simpleItem(BACK_TEXT, () -> this.setOpen(false));
+
+            // Solo mostrar opciones de archivo si no se hace clic sobre un pack específico dentro de la carpeta
+            folderMenuBuilder.when(this.root().getChildAt(mouseX, mouseY).isEmpty())
+                    .ifTrue(b -> b
+                            .whenNonNull(ObjectsUtil.mapOrNull(this.folderPack, FilePack::packed_packs$getPath))
+                            .ifTrue((path, operationsMenuBuilder) -> operationsMenuBuilder
+                                    .separator()
+                                    .simpleItem(RENAME_FILE_TEXT, this::canOperateFolder, this::renameDirectory)
+                                    .simpleItem(DELETE_FILE_TEXT, this::canOperateFolder, this::deleteDirectory)
+                                    .simpleItem(OPEN_FILE_TEXT, () -> PackUtil.openPack(this.folderPack))
+                                    .simpleItem(OPEN_PARENT_TEXT, () -> PackUtil.openParent(this.folderPack))
+                            )
+                    );
+        });
+        
+        ContextMenuContainer.super.buildItems(builder, mouseX, mouseY);
     }
 
     private boolean canOperateFolder() {
@@ -163,7 +176,9 @@ public class FolderDialog extends ToggleableDialog<FolderPackList> implements Co
     private void deleteDirectory() {
         if (this.fileOps.deletePack(this.folderPack)) {
             this.setOpen(false);
-            this.root().remove(this.folderPack);
+            if (this.parent != null) {
+                this.parent.remove(this.folderPack);
+            }
             this.sendEvent(new FileDeleteEvent(this.root()));
         }
     }
