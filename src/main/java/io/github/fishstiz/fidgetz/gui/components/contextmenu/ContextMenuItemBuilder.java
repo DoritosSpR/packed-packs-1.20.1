@@ -35,9 +35,12 @@ public class ContextMenuItemBuilder {
         return this.self();
     }
 
-    public ContextMenuItemBuilder separator() {
-        return this.isEmpty() || this.items.getLast() != MenuItem.SEPARATOR ? this.add(MenuItem.SEPARATOR) : this.self();
+    public ContextMenuItemBuilder addSeparator() {
+    if (this.items.isEmpty() || this.items.get(this.items.size() - 1) != MenuItem.SEPARATOR) {
+        return this.add(MenuItem.SEPARATOR);
     }
+    return this;
+}
 
     public ContextMenuItemBuilder separatorIfNonEmpty() {
         return this.isEmpty() ? this.self() : this.separator();
