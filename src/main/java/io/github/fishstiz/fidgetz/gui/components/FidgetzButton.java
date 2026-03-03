@@ -7,7 +7,7 @@ import net.minecraft.resources.ResourceLocation;
 public class FidgetzButton<E> extends Button implements Fidgetz {
     protected ResourceLocation sprite;
 
-    protected FidgetzButton(Builder<E> builder) {
+    protected FidgetzButton(Builder<E, ?> builder) {
         super(builder.x, builder.y, builder.width, builder.height, builder.message, builder.onPress, DEFAULT_NARRATION);
         this.sprite = builder.sprite;
     }
@@ -24,46 +24,43 @@ public class FidgetzButton<E> extends Button implements Fidgetz {
     @Override
     public int getHeight() { return this.height; }
 
-    // El método estático para obtener el builder
-    public static <E> Builder<E> builder() {
+    public static <E> Builder<E, Builder<E, ?>> builder() {
         return new Builder<>();
     }
 
-    public static class Builder<E> extends AbstractWidgetBuilder<Builder<E>> {
+    // T representa el tipo del Builder para permitir el encadenamiento (method chaining)
+    public static class Builder<E, T extends Builder<E, T>> extends AbstractWidgetBuilder<T> {
         protected OnPress onPress = (btn) -> {};
         protected ResourceLocation sprite;
 
         public Builder() {
-            this.width = 150; // Ancho por defecto de un botón de Minecraft
+            this.width = 150;
             this.height = 20;
         }
 
-        public Builder<E> onPress(OnPress onPress) {
+        public T onPress(OnPress onPress) {
             this.onPress = onPress;
             return self();
         }
 
-        public Builder<E> message(Component message) {
+        public T message(Component message) {
             this.message = message;
             return self();
         }
 
-        public Builder<E> setSprite(ResourceLocation sprite) {
+        public T setSprite(ResourceLocation sprite) {
             this.sprite = sprite;
             return self();
         }
 
-        /**
-         * Ajusta el tamaño para que sea un cuadrado basado en la altura.
-         * Útil para botones de iconos (como la 'X' de cerrar).
-         */
-        public Builder<E> makeSquare() {
+        public T makeSquare() {
             this.width = this.height;
             return self();
         }
 
+        @SuppressWarnings("unchecked")
         public FidgetzButton<E> build() {
-            return new FidgetzButton<>(this);
+            return new FidgetzButton<>((Builder<E, ?>) this);
         }
     }
 }
