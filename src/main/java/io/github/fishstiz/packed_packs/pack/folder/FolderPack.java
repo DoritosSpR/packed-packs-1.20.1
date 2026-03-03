@@ -1,20 +1,16 @@
-package io.github.fishstiz.packed_packs.pack.folder;
+package io.github.fishstiz.packed_packs.pack;
 
-import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.repository.Pack;
-import java.nio.file.Path;
+import net.minecraft.network.chat.Component;
+import java.util.List;
 
-public class FolderPack {
-    // Ejemplo de la línea que fallaba en el constructor/supplier:
-    public static Pack create(String id, Path path) {
-        return Pack.readMetaAndCreate(
-            id, 
-            net.minecraft.network.chat.Component.literal(id), 
-            false, 
-            (name) -> new net.minecraft.server.packs.PathPackResources(name, path, false), 
-            PackType.CLIENT_RESOURCES, 
-            Pack.Position.TOP, 
-            net.minecraft.server.packs.repository.PackSource.DEFAULT
-        );
+// Importante: Debe heredar de Pack para ser compatible
+public abstract class FolderPack extends Pack {
+    
+    public FolderPack(String id, boolean required, Pack.ResourcesSupplier resources, Component title, Pack.Info info, Pack.Position position, boolean fixed, boolean hidden) {
+        super(id, required, resources, title, info, position, fixed, hidden);
     }
+
+    public abstract List<Pack> flatten();
+    public abstract Component getTitle();
 }
