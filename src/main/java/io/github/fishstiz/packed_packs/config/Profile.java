@@ -7,65 +7,41 @@ import java.util.*;
 public class Profile implements Serializable {
     private final String name;
     private List<String> selectedPacks = new ArrayList<>();
-    private Map<String, String> remappedIds = new HashMap<>();
     private Set<String> requiredPacks = new HashSet<>();
-    private boolean locked = false;
-    private boolean hidden = false;
-    private boolean fixed = false;
-    private Pack.Position position = Pack.Position.TOP;
+    private Set<String> hiddenPacks = new HashSet<>();
+    private Map<String, Pack.Position> packPositions = new HashMap<>();
 
-    public Profile(String name) {
-        this.name = name;
-    }
+    public Profile(String name) { this.name = name; }
 
     public String getName() { return name; }
-    public List<String> getSelectedPacks() { return selectedPacks; }
-    public boolean isLocked() { return locked; }
-    public boolean isHidden(Pack pack) { return hidden; }
-    public boolean isHidden() { return hidden; }
-    public boolean isFixed(Pack pack) { return fixed; }
-    public boolean isFixed() { return fixed; }
-    public Pack.Position getPosition() { return position; }
-    public Pack.Position getPosition(Pack pack) { return position; }
-
-    public boolean isRequired(Pack pack) {
-        return requiredPacks.contains(pack.getId());
+    public String getId() { return name; } // Añadido para DevConfig
+    
+    public boolean includes(Pack pack) {
+        return selectedPacks.contains(pack.getId()) || requiredPacks.contains(pack.getId());
     }
 
-    public boolean overridesRequired(Pack pack) {
-        return requiredPacks.contains(pack.getId()) || selectedPacks.contains(pack.getId());
-    }
-
-    public boolean overridesPosition(Pack pack) {
-        return fixed;
-    }
-
-    public boolean hasOverride(Pack pack) {
-        return requiredPacks.contains(pack.getId()) || selectedPacks.contains(pack.getId()) || fixed || hidden;
-    }
-
-    public void setRequired(Object ignored, Pack pack) {
-        this.requiredPacks.add(pack.getId());
-    }
-
-    public boolean remapPackId(String oldId, String newId) {
-        if (oldId.equals(newId)) return false;
-        remappedIds.put(oldId, newId);
-        if (selectedPacks.contains(oldId)) {
-            Collections.replaceAll(selectedPacks, oldId, newId);
+    public void setHidden(boolean hidden, List<Pack> packs) {
+        for (Pack p : packs) {
+            if (hidden) hiddenPacks.add(p.getId());
+            else hiddenPacks.remove(p.getId());
         }
-        return true;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof Profile profile)) return false;
-        return Objects.equals(name, profile.name);
+    public void setRequired(boolean required, List<Pack> packs) {
+        for (Pack p : packs) {
+            if (required) requiredPacks.add(p.getId());
+            else requiredPacks.remove(p.getId());
+        }
     }
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(name);
+    public void setPosition(Pack.Position pos, List<Pack> packs) {
+        for (Pack p : packs) {
+            packPositions.put(p.getId(), pos);
+        }
     }
+
+    // Métodos de consulta existentes actualizados
+    public boolean isHidden(Pack pack) { return hiddenPacks.contains(pack.getId()); }
+    public boolean isRequired(Pack pack) { return requiredPacks.contains(pack.getId()); }
+    public Pack.Position getPosition(Pack pack) { return packPositions.getOrDefault(pack.getId(), Pack.Position.TOP); }
 }
