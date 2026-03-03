@@ -4,34 +4,33 @@ import io.github.fishstiz.fidgetz.gui.components.*;
 import io.github.fishstiz.fidgetz.gui.components.contextmenu.ContextMenuContainer;
 import io.github.fishstiz.fidgetz.gui.components.contextmenu.ContextMenuItemBuilder;
 import io.github.fishstiz.fidgetz.gui.renderables.sprites.Sprite;
+import io.github.fishstiz.fidgetz.util.DrawUtil;
 import io.github.fishstiz.packed_packs.gui.components.events.*;
 import io.github.fishstiz.packed_packs.pack.*;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 
-public class FolderDialog extends ToggleableDialog<FolderDialog> implements ContextMenuContainer {
-    private static final int SPACING = 4;
-    private static final int HEADER_HEIGHT = 16;
-    
+// Nota: Quitamos el genérico si causa problemas de bounds con la clase base
+public class FolderDialog extends ToggleableDialog implements ContextMenuContainer {
     private final FolderPackList content;
     private final PackListEventListener listener;
-    private int x, y, width, height;
-    private boolean visible;
     private FolderPack folderPack;
+    private Sprite folderSprite = PackAssetManager.DEFAULT_FOLDER_ICON;
+    
+    private int x, y, width, height;
+    private boolean visible = false;
 
     public <S extends Screen & ToggleableDialogContainer & PackListEventListener> FolderDialog(
             S screen, PackOptionsContext options, PackAssetManager assets, PackFileOperations fileOps
     ) {
-        // El error dice que super() no debe llevar argumentos
-        super();
+        super(); // Constructor sin argumentos según el error de Gradle
         this.listener = screen;
         this.content = new FolderPackList(options, assets, fileOps, screen);
     }
 
-    // Implementamos los getters/setters que faltan en la jerarquía
+    // Getters y Setters manuales para compensar lo que el compilador no encuentra en la clase base
     public void setX(int x) { this.x = x; }
     public void setY(int y) { this.y = y; }
     public void setWidth(int width) { this.width = width; }
@@ -41,9 +40,8 @@ public class FolderDialog extends ToggleableDialog<FolderDialog> implements Cont
     public int getWidth() { return width; }
     public int getHeight() { return height; }
 
-    // Reemplazamos isVisible() / isOpen() según lo que Fidgetz espera
     public boolean isVisible() { return this.visible; }
-    public void setVisible(boolean visible) { this.visible = visible; }
+    public void setOpen(boolean open) { this.visible = open; }
 
     public void updateFolder(PackList parent, FolderPack folderPack, PackAssetManager assets) {
         this.folderPack = folderPack;
@@ -52,30 +50,32 @@ public class FolderDialog extends ToggleableDialog<FolderDialog> implements Cont
         this.setWidth(parent.getWidth());
         this.setHeight(parent.getHeight());
         
-        // Posicionar contenido interno
-        this.content.setX(this.x + SPACING);
-        this.content.setY(this.y + HEADER_HEIGHT + (SPACING * 2));
-        this.content.setWidth(this.width - (SPACING * 2));
-        this.content.setHeight(this.height - HEADER_HEIGHT - (SPACING * 3));
+        assets.getOrLoadIcon(folderPack, icon -> this.folderSprite = icon);
+        
+        // Ajustar la lista interna
+        this.content.setX(this.x + 4);
+        this.content.setY(this.y + 20);
+        this.content.setWidth(this.width - 8);
+        this.content.setHeight(this.height - 24);
     }
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        if (!this.isVisible()) return;
+        if (!isVisible()) return;
         
-        // Renderizar el contenido
+        // Render fondo (Usa el DrawUtil de Fidgetz si está disponible)
+        guiGraphics.fill(x, y, x + width, y + height, 0xCC000000); 
+        
         this.content.render(guiGraphics, mouseX, mouseY, partialTick);
     }
 
     @Override
     public void buildItems(ContextMenuItemBuilder builder, int mouseX, int mouseY) {
-        // Implementación del menú contextual
+        // Aquí iría la lógica del menú contextual (Rename, Delete, etc.)
     }
 
     @Override
-    public void setFocused(@Nullable GuiEventListener listener) {
-        // Requerido por la interfaz de Minecraft
-    }
+    public void setFocused(@Nullable GuiEventListener listener) { }
 
     @Override
     public @Nullable GuiEventListener getFocused() {
