@@ -16,7 +16,7 @@ public abstract class PackList extends ObjectSelectionList<PackList.Entry> {
     protected int headerHeight = 0;
 
     public PackList(PackOptionsContext options, PackAssetManager assets, PackFileOperations fileOps, PackListEventListener listener) {
-        // Constructor de Minecraft 1.20.1: width, height, y0, y1, itemHeight
+        // Minecraft 1.20.1 constructor: Minecraft, width, height, top, bottom, itemHeight
         super(Minecraft.getInstance(), 200, 200, 32, 200 - 32, 36);
         this.options = options;
         this.assets = assets;
@@ -25,11 +25,18 @@ public abstract class PackList extends ObjectSelectionList<PackList.Entry> {
     }
 
     public int getRowTop(int index) {
+        // En 1.20.1 usamos getY() (si está disponible) o el campo 'top'
         return this.getY() + 4 - (int)this.getScrollAmount() + index * this.itemHeight + this.headerHeight;
     }
 
     protected int getIndexAt(double mouseX, double mouseY) {
         return (int)((mouseY - (double)this.getY() + this.getScrollAmount() - (double)this.headerHeight) / (double)this.itemHeight);
+    }
+    
+    // Método auxiliar para compatibilidad si getY() falla en algunas configuraciones de mappings
+    @Override
+    public int getY() {
+        return this.y0; // y0 es el campo protegido para la parte superior en 1.20.1
     }
 
     public abstract static class Entry extends ObjectSelectionList.Entry<Entry> {
