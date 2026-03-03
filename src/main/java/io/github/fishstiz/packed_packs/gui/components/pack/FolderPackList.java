@@ -14,11 +14,11 @@ public class FolderPackList extends PackList implements LayoutElement {
     private int x, y, width, height;
 
     public FolderPackList(PackOptionsContext options, PackAssetManager assets, PackFileOperations fileOps, Screen screen) {
-        // Parametros: minecraft, width, height, y0 (top), y1 (bottom), itemHeight
-        super(Minecraft.getInstance(), screen.width, screen.height, 40, screen.height - 40, 36);
-        this.width = screen.width;
-        this.height = screen.height;
-    }
+    // ELIMINA Minecraft.getInstance()
+    super(screen.width, screen.height, 40, screen.height - 40, 36); 
+    this.width = screen.width;
+    this.height = screen.height;
+}
 
     @Override public void setX(int x) { this.x = x; this.setLeftPos(x); }
     @Override public void setY(int y) { 
