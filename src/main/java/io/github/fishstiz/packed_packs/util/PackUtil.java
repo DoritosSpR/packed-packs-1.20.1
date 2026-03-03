@@ -22,6 +22,12 @@ public class PackUtil {
         Component.literal("Packed Packs").withStyle(ChatFormatting.YELLOW))
         .withStyle(ChatFormatting.GRAY), false);
 
+    // Método requerido por FileRenameModal
+    public static boolean isZipPack(Pack pack) {
+        if (pack == null) return false;
+        return pack.getId().toLowerCase().endsWith(ZIP_PACK_EXTENSION);
+    }
+
     public static String generatePackId(String name) {
         return INVALID_CHARS.matcher(name.toLowerCase().replace(" ", "_")).replaceAll("");
     }
@@ -51,7 +57,7 @@ public class PackUtil {
     }
 
     public static Path validatePackPath(Pack pack) {
-        // En 1.20.1, para simplificar y evitar errores de casteo:
+        // En 1.20.1 esto suele requerir un Accessor para obtener el Path desde la estructura de Pack
         return null; 
     }
 
