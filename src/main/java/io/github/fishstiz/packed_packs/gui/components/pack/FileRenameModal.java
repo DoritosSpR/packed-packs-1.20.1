@@ -16,7 +16,6 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.layouts.LinearLayout;
 import net.minecraft.client.gui.navigation.FocusNavigationEvent;
 import net.minecraft.client.gui.navigation.ScreenAxis;
-import net.minecraft.client.gui.navigation.ScreenDirection;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
@@ -37,10 +36,11 @@ public class FileRenameModal extends Modal<LinearLayout> {
     private static final int CONTENT_WIDTH = 256;
     private static final int SHADOW_SIZE = 24;
     private static final Pattern ILLEGAL_CHAR_PATTERN = Pattern.compile(".*[<>:\"/\\\\|?*].*");
-    private final RenderableRectWidget<Void> sprite;
-    private final FidgetzText<Void> title;
-    private final ToggleableEditBox<Void> nameEditor;
-    private final FidgetzButton<Void> saveButton;
+    
+    private final RenderableRectWidget sprite;
+    private final FidgetzText title;
+    private final ToggleableEditBox nameEditor;
+    private final FidgetzButton saveButton;
     private final PackFileOperations fileOps;
     private final PackAssetManager assets;
     private PackList packList;
@@ -56,21 +56,23 @@ public class FileRenameModal extends Modal<LinearLayout> {
         this.fileOps = fileOps;
         this.assets = assets;
 
-        this.sprite = RenderableRectWidget.<Void>builder(PackAssetManager.DEFAULT_ICON)
+        // Corregido: Eliminados los <Void> que causaban error de parámetros en el Builder
+        this.sprite = RenderableRectWidget.builder(PackAssetManager.DEFAULT_ICON)
                 .makeSquare()
                 .build();
-        this.title = FidgetzText.<Void>builder()
-                .makeSquare()
+        
+        this.title = FidgetzText.builder()
                 .setOffsetY(1)
                 .setShadow(true)
                 .build();
-        FidgetzButton<Void> closeButton = FidgetzButton.<Void>builder()
+
+        FidgetzButton closeButton = FidgetzButton.builder()
                 .makeSquare()
-                .setOnPress(this::closeModal)
+                .onPress(btn -> this.closeModal())
                 .setSprite(CROSS_SPRITE)
                 .build();
 
-        this.nameEditor = ToggleableEditBox.<Void>builder()
+        this.nameEditor = ToggleableEditBox.builder()
                 .setWidth(CONTENT_WIDTH)
                 .setEditable(true)
                 .addListener(this::handleChange)
@@ -78,45 +80,31 @@ public class FileRenameModal extends Modal<LinearLayout> {
                 .setFilter(this::testInput)
                 .build();
 
-        FidgetzButton<Void> cancelButton = FidgetzButton.<Void>builder()
-                .setOnPress(this::closeModal)
-                .setMessage(CommonComponents.GUI_CANCEL)
-                .build();
-        this.saveButton = FidgetzButton.<Void>builder()
-                .setOnPress(this::saveName)
-                .setMessage(CommonComponents.GUI_DONE)
+        FidgetzButton cancelButton = FidgetzButton.builder()
+                .onPress(btn -> this.closeModal())
+                .message(CommonComponents.GUI_CANCEL)
                 .build();
 
-        FlexLayout titleLayout = FlexLayout.horizontal(this::getContentWidth).spacing(SPACING);
-        titleLayout.addChild(this.sprite);
-        titleLayout.addFlexChild(this.title);
-        titleLayout.addChild(closeButton);
+        this.saveButton = FidgetzButton.builder()
+                .onPress(btn -> this.saveName())
+                .message(CommonComponents.GUI_DONE)
+                .build();
 
-        FlexLayout buttonLayout = FlexLayout.horizontal(this::getContentWidth).spacing(SPACING);
-        buttonLayout.addFlexChild(cancelButton);
-        buttonLayout.addFlexChild(this.saveButton);
+        FlexLayout titleRow = FlexLayout.horizontal(this::getContentWidth).spacing(SPACING);
+        titleRow.addChild(this.sprite);
+        titleRow.addFlexChild(this.title);
+        titleRow.addChild(closeButton);
 
-        this.root().layout().addChild(titleLayout);
-        this.root().layout().addChild(this.nameEditor);
-        this.root().layout().addChild(buttonLayout);
+        FlexLayout buttonRow = FlexLayout.horizontal(this::getContentWidth).spacing(SPACING);
+        buttonRow.addFlexChild(cancelButton);
+        buttonRow.addFlexChild(this.saveButton);
 
-        this.root().visitWidgets(this::addRenderableWidget);
-
-        this.addListener(this::onClose);
+        this.root().addChild(titleRow);
+        this.root().addChild(this.nameEditor);
+        this.root().addChild(buttonRow);
     }
 
-    private int getContentWidth() {
-        return CONTENT_WIDTH;
-    }
-
-    private void clearReferences() {
-        this.packList = null;
-        this.pack = null;
-        this.oldName = null;
-        this.sprite.setRenderableRect(PackAssetManager.DEFAULT_ICON);
-        this.title.setMessage(CommonComponents.EMPTY);
-        this.nameEditor.setValue("");
-    }
+    private int getContentWidth() { return CONTENT_WIDTH; }
 
     public void open(PackList packList, Pack pack) {
         this.packList = packList;
@@ -133,63 +121,34 @@ public class FileRenameModal extends Modal<LinearLayout> {
         this.setOpen(true);
     }
 
-    private boolean testInput(String input) {
-        if (input == null || (!input.isEmpty() && input.isBlank())) {
-            return false;
-        }
-        return testIllegalChars(input);
-    }
-
-    private boolean canSave(String input) {
-        if (input == null || input.isBlank()) {
-            return false;
-        }
-        if (this.pack == null || PackUtil.validatePackPath(pack) == null) {
-            return false;
-        }
-        String trimmed = input.trim();
-        if (Objects.equals(this.oldName, trimmed)) {
-            return false;
-        }
-        return testIllegalChars(input);
-    }
-
     private void handleChange(String name) {
         this.saveButton.active = this.canSave(name);
     }
 
-    private void onClose(boolean open) {
-        if (open) return;
+    private boolean testInput(String input) {
+        if (input == null || (!input.isEmpty() && input.isBlank())) return false;
+        return testIllegalChars(input);
+    }
 
-        PackList target = this.packList;
-        Pack trigger = this.pack;
-
-        if (target != null) {
-            ((PackListEventListener) this.screen).onEvent(new FileRenameCloseEvent(target, trigger));
-        }
-
-        this.clearReferences();
+    private boolean canSave(String input) {
+        if (input == null || input.isBlank() || this.pack == null) return false;
+        String trimmed = input.trim();
+        return !Objects.equals(this.oldName, trimmed) && testIllegalChars(input);
     }
 
     private void saveName() {
         String newName = this.nameEditor.getValue();
-        if (!this.canSave(newName)) {
-            return;
-        }
+        if (!this.canSave(newName)) return;
 
         String sanitizedName = sanitizeNameForSave(this.pack, newName);
         if (this.fileOps.renamePack(this.pack, sanitizedName)) {
-            Component sanitizedNameText = Component.literal(sanitizedName);
+            Component nameText = Component.literal(sanitizedName);
             if (this.packList != null) {
                 PackList.Entry entry = this.packList.getEntry(this.pack);
-                if (entry != null) {
-                    entry.onRename(sanitizedNameText);
-                }
+                if (entry != null) entry.onRename(nameText);
             }
-
-            ((PackListEventListener) this.screen).onEvent(new FileRenameEvent(this.packList, this.pack, sanitizedNameText));
-            this.setOpen(false);
-            this.clearReferences();
+            ((PackListEventListener) this.screen).onEvent(new FileRenameEvent(this.packList, this.pack, nameText));
+            this.closeModal();
         } else {
             ToastUtil.onFileFailToast(ToastUtil.getRenameFailText(pack.getTitle().getString(), newName));
         }
@@ -207,53 +166,32 @@ public class FileRenameModal extends Modal<LinearLayout> {
 
     private static boolean testIllegalChars(@NotNull String input) {
         input = input.trim();
-        if (!input.equals(FilenameUtils.getName(input))) {
-            return false;
-        }
-        return !ILLEGAL_CHAR_PATTERN.matcher(input).matches();
+        return input.equals(FilenameUtils.getName(input)) && !ILLEGAL_CHAR_PATTERN.matcher(input).matches();
     }
 
     @Override
-    protected void renderBackground(GuiGraphics guiGraphics, int x, int y, int width, int height, int mouseX, int mouseY, float partialTick) {
-        DrawUtil.renderDropShadow(guiGraphics, x, y, width, height, SHADOW_SIZE);
-        super.renderBackground(guiGraphics, x, y, width, height, mouseX, mouseY, partialTick);
+    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        if (!this.isOpen()) return;
+        DrawUtil.renderDropShadow(guiGraphics, root().getX(), root().getY(), root().getWidth(), root().getHeight(), SHADOW_SIZE);
+        super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        boolean keyPressed = super.keyPressed(keyCode, scanCode, modifiers);
-        if (!keyPressed && this.isOpen() && keyCode == InputConstants.KEY_RETURN && this.canSave(this.nameEditor.getValue())) {
+        if (this.isOpen() && keyCode == InputConstants.KEY_RETURN && this.canSave(this.nameEditor.getValue())) {
             this.saveName();
             return true;
         }
-        return keyPressed;
-    }
-
-    @Override
-    public boolean charTyped(char codePoint, int modifiers) {
-        boolean charTyped = super.charTyped(codePoint, modifiers);
-
-        if (!charTyped && this.isOpen() && !this.nameEditor.isFocused()) {
-            this.setFocused(this.nameEditor);
-            return this.nameEditor.charTyped(codePoint, modifiers);
-        }
-
-        return charTyped;
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override
     public @Nullable ComponentPath nextFocusPath(FocusNavigationEvent event) {
-        // REESCRITO PARA JAVA 17
-        if (this.nameEditor.isFocused() && event instanceof FocusNavigationEvent.ArrowNavigation) {
-            FocusNavigationEvent.ArrowNavigation arrowNav = (FocusNavigationEvent.ArrowNavigation) event;
+        if (this.nameEditor.isFocused() && event instanceof FocusNavigationEvent.ArrowNavigation arrowNav) {
             if (arrowNav.direction().getAxis() == ScreenAxis.HORIZONTAL) {
-                if (!Screen.hasShiftDown()) {
-                    this.nameEditor.setHighlightPos(this.nameEditor.getCursorPosition());
-                }
                 return ComponentPath.path(this.nameEditor, this);
             }
         }
-
         return super.nextFocusPath(event);
     }
 }
