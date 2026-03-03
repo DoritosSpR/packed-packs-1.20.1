@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.function.Supplier;
 
 public class JsonLoader {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -18,6 +19,11 @@ public class JsonLoader {
         }
     }
 
+    public static <T> T loadJsonOrDefault(Path path, Class<T> clazz, Supplier<T> defaultValue) {
+        T loaded = load(path, clazz);
+        return loaded != null ? loaded : defaultValue.get();
+    }
+
     public static <T> void save(Path path, T object) {
         try {
             Files.createDirectories(path.getParent());
@@ -25,5 +31,10 @@ public class JsonLoader {
                 GSON.toJson(object, writer);
             }
         } catch (Exception ignored) {}
+    }
+
+    // Alias para compatibilidad con llamadas existentes
+    public static void saveJson(Object obj, Path path) {
+        save(path, obj);
     }
 }
