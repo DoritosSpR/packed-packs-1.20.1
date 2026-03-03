@@ -51,14 +51,13 @@ public class FidgetzButton<E> extends Button implements Fidgetz, ContextMenuProv
     @Override
     public void onPress() {
         super.onPress();
-        for (var listener : this.listeners) {
+        for (Runnable listener : this.listeners) {
             listener.run();
         }
     }
 
     @Override
     protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        // En 1.20.1 isHovered se calcula manualmente si es necesario o se usa el de super
         this.isHovered = mouseX >= this.getX() && mouseY >= this.getY() && 
                          mouseX < this.getX() + this.width && mouseY < this.getY() + this.height;
 
@@ -91,11 +90,8 @@ public class FidgetzButton<E> extends Button implements Fidgetz, ContextMenuProv
         }
     }
 
-    @Override
-    public E getMetadata() { return this.metadata; }
-    
-    @Override
-    public void setMetadata(E metadata) { this.metadata = metadata; }
+    @Override public E getMetadata() { return this.metadata; }
+    @Override public void setMetadata(E metadata) { this.metadata = metadata; }
 
     @Override
     public void buildItems(ContextMenuItemBuilder builder, int mouseX, int mouseY) {
@@ -104,9 +100,7 @@ public class FidgetzButton<E> extends Button implements Fidgetz, ContextMenuProv
         }
     }
 
-    public static <E> Builder<E, ?> builder() {
-        return new Builder<>();
-    }
+    public static <E> Builder<E, ?> builder() { return new Builder<>(); }
 
     public static class Builder<E, B extends Builder<E, B>> extends AbstractWidgetBuilder<B> {
         private final List<Runnable> listeners = new ObjectArrayList<>();
@@ -121,14 +115,12 @@ public class FidgetzButton<E> extends Button implements Fidgetz, ContextMenuProv
         private E metadata;
 
         public B setMessage(Component message) { this.message = message; return self(); }
-        public B setMessage(String message) { return this.setMessage(Component.translatable(message)); }
         public B setTooltip(Tooltip tooltip) { this.tooltip = tooltip; return self(); }
         public B setSprite(ButtonSprites sprites) { this.sprites = sprites; return self(); }
         public B spriteOnly() { this.spriteOnly = true; return self(); }
         public B setForeground(RenderableRect foreground) { this.foreground = foreground; return self(); }
-        public B setFocusedBorder(Integer hoverBorder) { this.focusedBorder = hoverBorder; return self(); }
+        public B setFocusedBorder(Integer border) { this.focusedBorder = border; return self(); }
         public B setOnPress(OnPress onPress) { this.onPress = onPress; return self(); }
-        public B setOnPress(Runnable onPress) { this.onPress = btn -> onPress.run(); return self(); }
         public B addListener(Runnable listener) { this.listeners.add(listener); return self(); }
         public B setContextMenuBuilder(BiConsumer<FidgetzButton<E>, ContextMenuItemBuilder> cb) { this.contextMenuBuilder = cb; return self(); }
         public B setMetadata(E metadata) { this.metadata = metadata; return self(); }
