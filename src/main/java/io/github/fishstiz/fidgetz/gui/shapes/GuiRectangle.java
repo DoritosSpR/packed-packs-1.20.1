@@ -1,33 +1,8 @@
-package io.github.fishstiz.fidgetz.gui.shapes;
-
-import net.minecraft.client.gui.navigation.ScreenRectangle;
-import net.minecraft.client.gui.layouts.LayoutElement;
-import net.minecraft.util.Mth;
+package io.github.fishstiz.fidgetz.gui.util;
 
 public record GuiRectangle(int x, int y, int width, int height) {
-    
-    public static GuiRectangle viewOf(int x, int y, int width, int height) {
-        return new GuiRectangle(x, y, width, height);
-    }
-
-    public static GuiRectangle viewOf(LayoutElement element) {
-        return new GuiRectangle(element.getX(), element.getY(), element.getWidth(), element.getHeight());
-    }
-
-    public boolean containsPoint(double mouseX, double mouseY) {
-        return mouseX >= (double)this.x && mouseX < (double)(this.x + this.width) 
-            && mouseY >= (double)this.y && mouseY < (double)(this.y + this.height);
-    }
-
-    public boolean contains(GuiRectangle other) {
-        return other.x >= this.x && (other.x + other.width) <= (this.x + this.width)
-            && other.y >= this.y && (other.y + other.height) <= (this.y + this.height);
-    }
-
-    public ScreenRectangle getScreenRectangle() {
-        return new ScreenRectangle(x, y, width, height);
-    }
-
-    public int getRight() { return x + width; }
-    public int getBottom() { return y + height; }
+    public int left() { return x; }
+    public int top() { return y; }
+    public int right() { return x + width; }
+    public int bottom() { return y + height; }
 }
