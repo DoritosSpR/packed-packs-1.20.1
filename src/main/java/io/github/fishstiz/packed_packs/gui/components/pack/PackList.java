@@ -21,11 +21,17 @@ public abstract class PackList extends ObjectSelectionList<PackList.Entry> imple
 
     public PackList(Minecraft minecraft, int width, int height, int top, int bottom, int itemHeight, 
                     PackOptionsContext options, PackAssetManager assets, PackFileOperations fileOps, PackListEventListener listener) {
+        // En 1.20.1: minecraft, width, height, y0 (top), y1 (bottom), itemHeight
         super(minecraft, width, height, top, bottom, itemHeight);
         this.options = options;
         this.assets = assets;
         this.fileOps = fileOps;
         this.listener = listener;
+    }
+
+    // Métodos de utilidad para las clases hijas (corrige error en AvailablePackList)
+    public boolean scrollbarVisible() {
+        return this.getMaxScroll() > 0;
     }
 
     @Override public int getX() { return this.x0; }
@@ -47,7 +53,6 @@ public abstract class PackList extends ObjectSelectionList<PackList.Entry> imple
         public abstract boolean isSelectedLast();
         public abstract boolean isTransferable();
         public abstract void transfer();
-        // Añadido para resolver el error de "cannot find symbol onRename"
         public abstract void onRename(Component newName);
         protected abstract void sendPacks(Pack trigger, List<Pack> required);
 
