@@ -13,6 +13,7 @@ public class PackedPacks {
     public static final Logger LOGGER = LogManager.getLogger();
 
     public PackedPacks() {
+        // Inicializa el API Singleton
         PackedPacksApiImpl.getInstance();
     }
 
