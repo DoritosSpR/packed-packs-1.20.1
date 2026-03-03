@@ -1,31 +1,26 @@
 package io.github.fishstiz.packed_packs.util;
 
-import io.github.fishstiz.packed_packs.PackedPacks;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
 
 public class ResourceUtil {
-    private ResourceUtil() {
+    public static final String MOD_ID = "packed_packs";
+    public static final String MOD_NAME = "Packed Packs";
+
+    public static Component getText(String key) {
+        return Component.translatable(MOD_ID + "." + key);
     }
 
-    public static MutableComponent getModName() {
-        return Component.literal(PackedPacks.MOD_NAME);
-    }
-
-    public static MutableComponent getText(String keySuffix, Object... args) {
-        return Component.translatable(PackedPacks.MOD_ID + "." + keySuffix, args);
-    }
-
-    public static ResourceLocation id(String path) {
-        return ResourceLocation.fromNamespaceAndPath(PackedPacks.MOD_ID, path);
-    }
-
-    public static ResourceLocation getIcon(String icon) {
-        return id("textures/gui/sprites/icon/").withSuffix(icon + ".png");
+    public static ResourceLocation getGuiSprite(String path) {
+        // En 1.20.1 se usa el constructor de ResourceLocation directamente
+        return new ResourceLocation(MOD_ID, "textures/gui/sprites/" + path + ".png");
     }
 
     public static ResourceLocation getVanillaSprite(String path) {
-        return ResourceLocation.withDefaultNamespace("textures/gui/sprites/" + path + ".png");
+        return new ResourceLocation("minecraft", "textures/gui/sprites/" + path + ".png");
+    }
+
+    public static ResourceLocation fromPath(String path) {
+        return new ResourceLocation(MOD_ID, path);
     }
 }
