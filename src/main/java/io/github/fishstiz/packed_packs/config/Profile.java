@@ -1,31 +1,41 @@
 package io.github.fishstiz.packed_packs.config;
 
-import io.github.fishstiz.packed_packs.util.PackUtil;
 import net.minecraft.server.packs.repository.Pack;
+import java.nio.file.Path;
+import java.io.Serializable;
 import java.util.*;
 
-public class Profile {
+public class Profile implements Serializable {
+    public String id;
+    public String name;
+    public Path saveFolder;
+    public boolean temp = false;
     private final Set<String> packIds = new HashSet<>();
+    private final Set<String> hiddenPacks = new HashSet<>();
+    private final Set<String> fixedPacks = new HashSet<>();
+    private final Map<String, Pack.Position> positions = new HashMap<>();
 
-    public boolean remapPackId(String oldId, String newId) {
-        if (packIds.contains(oldId)) {
-            packIds.remove(oldId);
-            packIds.add(newId);
-            return true;
-        }
-        return false;
+    public Profile() {}
+
+    public Profile(String name, Path saveFolder) {
+        this.name = name;
+        this.saveFolder = saveFolder;
     }
 
-    public boolean overridesRequired(Pack pack) {
-        // Tu lógica para determinar si este perfil sobreescribe la obligatoriedad
-        return false; 
+    public String getId() { return id != null ? id : ""; }
+    public String getName() { return name != null ? name : id; }
+    
+    public boolean isHidden(Pack pack) { return hiddenPacks.contains(pack.getId()); }
+    public boolean isFixed(Pack pack) { return fixedPacks.contains(pack.getId()); }
+    public boolean isLocked() { return false; }
+    
+    public Pack.Position getPosition(Pack pack) { return positions.getOrDefault(pack.getId(), pack.getDefaultPosition()); }
+    public boolean overridesPosition(Pack pack) { return positions.containsKey(pack.getId()) || fixedPacks.contains(pack.getId()); }
+
+    public void setRequired(Boolean required, Pack pack) {
+        if (required == null) fixedPacks.remove(pack.getId());
+        else if (required) fixedPacks.add(pack.getId());
     }
 
-    public boolean isRequired(Pack pack) {
-        return PackUtil.isEssential(pack);
-    }
-
-    public boolean hasOverride(Pack pack) {
-        return packIds.contains(pack.getId());
-    }
+    public boolean hasOverride(Pack pack) { return packIds.contains(pack.getId()); }
 }
