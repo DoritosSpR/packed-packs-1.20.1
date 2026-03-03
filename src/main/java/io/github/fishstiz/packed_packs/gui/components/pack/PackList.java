@@ -24,8 +24,8 @@ public abstract class PackList extends AbstractFixedListWidget<PackList.Entry> {
     }
 
     public int getRowIndex(double mouseY) {
-        return (int)((mouseY - (double)this.top + this.getScrollAmount() - (double)this.headerHeight) / (double)this.itemHeight);
-    }
+    return (int)((mouseY - (double)this.getY() + this.getScrollAmount() - (double)this.headerHeight) / (double)this.itemHeight);
+}
 
     public abstract class Entry extends ContainerObjectSelectionList.Entry<Entry> {
         protected final int index;
