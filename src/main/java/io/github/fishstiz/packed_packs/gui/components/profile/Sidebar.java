@@ -15,15 +15,22 @@ public class Sidebar extends ToggleableDialog<LayoutWrapper<FlexLayout>> impleme
     private static final int MIN_WIDTH = 100;
 
     public <S extends Screen & ToggleableDialogContainer> Sidebar(S screen) {
+        // Se llama al constructor de ToggleableDialog pasando el builder
         super(createBuilder(screen));
 
         this.root().setPadding(SPACING);
         this.root().setMinWidth(MIN_WIDTH);
     }
 
-    private static <S extends Screen & ToggleableDialogContainer> Builder<LayoutWrapper<FlexLayout>, ?> createBuilder(S screen) {
+    /**
+     * Ajustado para devolver ToggleableDialog.Builder y resolver los errores de "cannot find symbol Builder"
+     */
+    private static <S extends Screen & ToggleableDialogContainer> ToggleableDialog.Builder<LayoutWrapper<FlexLayout>, ?> createBuilder(S screen) {
         FlexLayout layout = FlexLayout.vertical(() -> getMaxHeight(screen)).spacing(SPACING);
-        return builder(screen, new LayoutWrapper<>(layout)).setBackground(DEMO_BACKGROUND);
+        
+        // Usamos el método estático builder definido en ToggleableDialog
+        return ToggleableDialog.<LayoutWrapper<FlexLayout>, S>builder(screen, new LayoutWrapper<>(layout))
+                .setBackground(DEMO_BACKGROUND);
     }
 
     public void init(Component title, Runnable onClose, int maxWidth) {
@@ -34,6 +41,7 @@ public class Sidebar extends ToggleableDialog<LayoutWrapper<FlexLayout>> impleme
                 .setOnPress(() -> this.setOpen(false))
                 .addListener(onClose)
                 .build();
+
         final FidgetzText<Void> titleWidget = FidgetzText.<Void>builder()
                 .setMessage(title)
                 .setOffsetY(1)
@@ -48,7 +56,8 @@ public class Sidebar extends ToggleableDialog<LayoutWrapper<FlexLayout>> impleme
     }
 
     public void repositionElements() {
-        this.root().setMinHeight(getMaxHeight(this.screen));
+        // Se asume que 'this.screen' es accesible desde la clase padre o el contexto
+        this.root().setMinHeight(getMaxHeight(this.getScreen())); 
         this.root().arrangeElements();
         this.root().setPosition(0, 0);
     }
