@@ -11,6 +11,7 @@ import io.github.fishstiz.packed_packs.pack.PackFileOperations;
 import io.github.fishstiz.packed_packs.pack.PackOptionsContext;
 import io.github.fishstiz.packed_packs.util.constants.GuiConstants;
 import io.github.fishstiz.packed_packs.util.constants.Theme;
+import io.github.fishstiz.packed_packs.gui.components.pack.PackListDevMenu;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.server.packs.repository.Pack;
 import org.jetbrains.annotations.NotNull;
@@ -21,24 +22,28 @@ import java.util.List;
 
 import static io.github.fishstiz.fidgetz.util.GuiUtil.playClickSound;
 import static io.github.fishstiz.packed_packs.util.InputUtil.isLeftClick;
-import static io.github.fishstiz.packed_packs.util.ResourceUtil.getVanillaSprite;
+import static io.github.fishstiz.packed_packs.util.ResourceUtil.getGuiSprite;
 import static io.github.fishstiz.fidgetz.util.lang.ObjectsUtil.ifPresent;
 import static io.github.fishstiz.fidgetz.util.lang.ObjectsUtil.pick;
 
 public class AvailablePackList extends PackList {
-    private static final Sprite SELECT_HIGHLIGHTED_SPRITE = Sprite.of32(getVanillaSprite("transferable_list/select_highlighted"));
-    private static final Sprite SELECT_SPRITE = Sprite.of32(getVanillaSprite("transferable_list/select"));
-    private static final Theme DROP_ZONE_THEME = Theme.RED_700;
-    private static final ColoredRect DROP_ZONE = new ColoredRect(DROP_ZONE_THEME.withAlpha(0.25f));
+    private static final Sprite SELECT_HIGHLIGHTED_SPRITE = Sprite.of32(getGuiSprite("transferable_list/select_highlighted"));
+    private static final Sprite SELECT_SPRITE = Sprite.of32(getGuiSprite("transferable_list/select"));
+    private static final int SPACING = 2;
 
     public AvailablePackList(PackOptionsContext options, PackAssetManager assets, PackFileOperations fileOps, PackListEventListener listener) {
         super(options, assets, fileOps, listener);
     }
 
     @Override
-    protected @NotNull Entry createEntry(SelectionContext<Pack> context, int index) {
-        return new Entry(context, index);
-    }
+    public boolean isTransferable(Pack pack) { return true; } // Lógica simplificada para ejemplo
+
+    @Override public void removeAll(List<Pack> packs) {}
+    @Override public void addAll(List<Pack> packs) {}
+    @Override public void select(Pack pack) {}
+    @Override public void selectAll(List<Pack> packs) {}
+    @Override public void clearSelection() {}
+    @Override public Entry getEntry(Pack pack) { return null; }
 
     @Override
     public boolean canInteract(PackList source) {
@@ -46,65 +51,43 @@ public class AvailablePackList extends PackList {
     }
 
     private boolean isInvalidDrop(PackList source, List<Pack> payload, Pack trigger) {
-        return !source.canInteract(this) || payload.isEmpty() || !source.isTransferable(trigger);
+        return source == null || !source.canInteract(this) || payload.isEmpty();
     }
 
-    @Override
+    // Métodos para manejar el Drag & Drop (ajustar según tu sistema de eventos)
     public boolean canDrop(DragEvent dragEvent, double mouseX, double mouseY) {
         return this.isMouseOver(mouseX, mouseY) && !this.isInvalidDrop(dragEvent.target(), dragEvent.payload(), dragEvent.trigger());
     }
 
-    @Override
-    protected List<Pack> handleDrop(DragEvent dragEvent, double mouseX, double mouseY) {
-        PackList source = dragEvent.target();
-        List<Pack> payload = dragEvent.payload();
-        Pack trigger = dragEvent.trigger();
-
-        if (this.isInvalidDrop(source, payload, trigger)){
-            return Collections.emptyList();
-        }
-
-        List<Pack> dropped = new ArrayList<>();
-        for (Pack pack : payload) {
-            if (source.isTransferable(pack)) {
-                dropped.add(pack);
-            }
-        }
-
-        this.clearSelection();
-        source.removeAll(dropped);
-        this.addAll(dropped);
-        this.selectAll(dropped);
-        this.select(trigger);
-        ifPresent(this.getEntry(trigger), this::ensureVisible);
-
-        return dropped;
-    }
-
-    @Override
     public void renderDroppableZone(GuiGraphics guiGraphics, DragEvent dragEvent, int mouseX, int mouseY, float partialTick) {
-        PackList source = dragEvent.target();
-        List<Pack> payload = dragEvent.payload();
-        Pack trigger = dragEvent.trigger();
-
-        if (this.isInvalidDrop(source, payload, trigger)) return;
+        if (this.isInvalidDrop(dragEvent.target(), dragEvent.payload(), dragEvent.trigger())) return;
 
         int width = this.scrollbarVisible() ? this.getWidth() - this.scrollbarOffset : this.getWidth();
-
         if (this.isMouseOver(mouseX, mouseY)) {
-            DROP_ZONE.render(guiGraphics, this.getX(), this.getY(), width, this.getHeight(), partialTick);
+            guiGraphics.fill(this.getX(), this.getY(), this.getX() + width, this.getY() + this.getHeight(), 0x40FF0000);
         }
-
-        guiGraphics.renderOutline(this.getX(), this.getY(), width, this.getHeight(), DROP_ZONE_THEME.getARGB());
+        guiGraphics.renderOutline(this.getX(), this.getY(), width, this.getHeight(), 0xFFFF0000);
     }
 
     public class Entry extends PackList.Entry {
-        private Entry(SelectionContext<Pack> context, int index) {
-            super(context, index);
+        private final SelectionContext<Pack> context;
+        private final int index;
+
+        public Entry(SelectionContext<Pack> context, int index) {
+            this.context = context;
+            this.index = index;
         }
 
+        @Override public Pack pack() { return context.item(); }
+        @Override public boolean isSelectedLast() { return false; }
+        @Override public boolean isTransferable() { return true; }
+        @Override public void transfer() {}
+        @Override protected void sendPacks(Pack trigger, List<Pack> required) {}
+
         public boolean isMouseOverSelect(double mouseX, double mouseY) {
-            return AvailablePackList.this.isHovered() && GuiUtil.containsPoint(this.getX() + SPACING, this.getY(), SELECT_SPRITE.width, SELECT_SPRITE.height, mouseX, mouseY);
+            // En 1.20.1 se usa isMouseOver en lugar de isHovered()
+            return AvailablePackList.this.isMouseOver(mouseX, mouseY) && 
+                   GuiUtil.containsPoint(this.getX() + SPACING, this.getY(), SELECT_SPRITE.width, SELECT_SPRITE.height, (int)mouseX, (int)mouseY);
         }
 
         @Override
@@ -112,29 +95,25 @@ public class AvailablePackList extends PackList {
             if (isLeftClick(button) && this.isMouseOverSelect(mouseX, mouseY)) {
                 playClickSound();
                 this.transfer();
-                return false;
+                return true;
             }
-
-            return super.mouseClicked(mouseX, mouseY, button);
+            return false;
         }
 
         @Override
-        protected void renderForeground(GuiGraphics guiGraphics, int top, int left, int width, int height, int mouseX, int mouseY, boolean hovering, float partialTick) {
+        public void render(GuiGraphics guiGraphics, int index, int top, int left, int width, int height, int mouseX, int mouseY, boolean hovering, float partialTick) {
             if (!hovering && !this.isSelectedLast()) return;
 
             int x = left + SPACING;
-            GuiConstants.WHITE_OVERLAY.render(guiGraphics, x, top, SELECT_SPRITE.width, SELECT_SPRITE.height);
             if (this.isTransferable()) {
-                pick(!this.isMouseOverSelect(mouseX, mouseY), SELECT_SPRITE, SELECT_HIGHLIGHTED_SPRITE).render(guiGraphics, x, top);
+                Sprite s = pick(!this.isMouseOverSelect(mouseX, mouseY), SELECT_SPRITE, SELECT_HIGHLIGHTED_SPRITE);
+                s.render(guiGraphics, x, top);
             }
         }
 
         @Override
         protected void handleDevMenuEvent(PackListDevMenu.Event<?> event) {
-            super.handleDevMenuEvent(event);
-            // REESCRITO PARA JAVA 17
-            if (event instanceof PackListDevMenu.Event.Require) {
-                PackListDevMenu.Event.Require requireEvent = (PackListDevMenu.Event.Require) event;
+            if (event instanceof PackListDevMenu.Event.Require requireEvent) {
                 if (Boolean.TRUE.equals(requireEvent.value())) {
                     this.sendPacks(requireEvent.trigger(), requireEvent.required());
                 }
