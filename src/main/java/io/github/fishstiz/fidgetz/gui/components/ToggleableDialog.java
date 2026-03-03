@@ -308,20 +308,9 @@ public class ToggleableDialog<T extends LayoutElement> extends AbstractContainer
     }
 
     public void focus() {
-        if (this.isOpen()) {
-            this.screen.clearFocus();
-            ComponentPath path;
-            if (this.children.isEmpty()) {
-                path = ComponentPath.path(this, this.screen);
-            } else {
-                GuiEventListener firstFocusable = this.getFirstFocusable();
-                path = firstFocusable != null
-                        ? ComponentPath.path(firstFocusable, this, this.screen)
-                        : ComponentPath.path(this, this.screen);
-            }
-            if (path != null) path.applyFocus(true);
-        }
-    }
+        if (this.screen != null) {
+    this.screen.setFocused(null); 
+}
 
     @Override
     public @Nullable ComponentPath nextFocusPath(FocusNavigationEvent event) {
