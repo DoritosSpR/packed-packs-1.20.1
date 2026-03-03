@@ -1,4 +1,4 @@
-package io.github.fishstiz.fidgetz.gui.util;
+package io.github.fishstiz.fidgetz.gui.shapes;
 
 public record GuiRectangle(int x, int y, int width, int height) {
     public int left() { return x; }
