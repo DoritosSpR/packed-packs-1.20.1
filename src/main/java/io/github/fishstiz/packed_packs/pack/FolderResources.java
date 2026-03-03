@@ -1,80 +1,51 @@
-package io.github.fishstiz.packed_packs.pack.folder;
+package io.github.fishstiz.packed_packs.pack;
 
-import io.github.fishstiz.packed_packs.util.PackUtil;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.packs.PackResources;
+import net.minecraft.server.packs.AbstractPackResources;
 import net.minecraft.server.packs.PackType;
-import net.minecraft.server.packs.metadata.MetadataSectionSerializer;
 import net.minecraft.server.packs.resources.IoSupplier;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.Set;
 
-public class FolderResources implements PackResources {
-    public static final String FOLDER_CONFIG_FILENAME = "packed_packs.folderpack.json";
-    private final String name;
-    private final Path path;
+public class FolderResources extends AbstractPackResources {
+    private final Path root;
 
-    public FolderResources(String name, Path path) {
-        this.name = name;
-        this.path = path;
+    public FolderResources(String id, boolean isBuiltin, Path root) {
+        super(id, isBuiltin);
+        this.root = root;
     }
 
     @Override
     @Nullable
-    public IoSupplier<InputStream> getRootResource(String... elements) {
-        // En 1.20.1, elements suele ser el nombre del archivo (ej: "pack.mcmeta")
-        if (elements.length > 0) {
-            String fileName = String.join("/", elements);
-            if (fileName.equals(PackUtil.ICON_FILENAME) || fileName.equals(FOLDER_CONFIG_FILENAME)) {
-                Path filePath = this.path.resolve(fileName);
-                if (Files.exists(filePath)) {
-                    return IoSupplier.create(filePath);
-                }
-            }
+    public IoSupplier<InputStream> getRootResource(String... paths) {
+        Path path = this.root;
+        for (String s : paths) {
+            path = path.resolve(s);
         }
-        return null;
+        return java.nio.file.Files.exists(path) ? IoSupplier.create(path) : null;
     }
 
     @Override
     @Nullable
-    public IoSupplier<InputStream> getResource(PackType packType, ResourceLocation location) {
-        // FolderPack en este mod funciona como contenedor, no suele tener texturas/modelos directos
-        return null;
+    public IoSupplier<InputStream> getResource(PackType type, ResourceLocation location) {
+        // Lógica básica para obtener recursos (texturas, json, etc)
+        return null; 
     }
 
     @Override
-    public void listResources(PackType packType, String namespace, String path, PackResources.ResourceOutput resourceOutput) {
-        // En 1.20.1, el parámetro es PackResources.ResourceOutput
-        // Si no tiene recursos propios, se deja vacío para evitar errores de iteración
+    public void listResources(PackType type, String namespace, String path, ResourceOutput output) {
+        // Implementación requerida por AbstractPackResources
     }
 
     @Override
-    @NotNull
     public Set<String> getNamespaces(PackType type) {
-        return Collections.emptySet();
-    }
-
-    @Override
-    @Nullable
-    public <T> T getMetadataSection(MetadataSectionSerializer<T> deserializer) {
-        // Si el FolderPack no tiene un pack.mcmeta real, devolvemos null
-        return null;
-    }
-
-    @Override
-    @NotNull
-    public String packId() {
-        return this.name;
+        return Set.of();
     }
 
     @Override
     public void close() {
-        // No hay flujos abiertos que cerrar aquí
     }
 }
