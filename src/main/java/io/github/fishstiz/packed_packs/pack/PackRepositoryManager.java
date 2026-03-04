@@ -1,27 +1,30 @@
 package io.github.fishstiz.packed_packs.pack;
 
-import com.google.common.collect.Lists;
-import net.minecraft.Util;
 import net.minecraft.server.packs.repository.Pack;
-import java.nio.file.Path;
-import java.util.List;
+import net.minecraft.server.packs.repository.PackRepository;
+import java.util.Collection;
 
 public class PackRepositoryManager {
-    private final Path packDir;
+    private final PackRepository repository;
 
-    public PackRepositoryManager(Path packDir) {
-        this.packDir = packDir;
+    public PackRepositoryManager(PackRepository repository) {
+        this.repository = repository;
     }
 
-    public void handlePacks(List<Pack> selected) {
-        // CORRECCIÓN: Lists.reverse en lugar de .reversed()
-        for (Pack pack : Lists.reverse(selected)) {
-            // Lógica de procesamiento
+    // En 1.20.1 no existe getSelection().getStatus(), usamos la lógica directa del repositorio
+    public boolean isEnabled(String id) {
+        return this.repository.getSelectedIds().contains(id);
+    }
+
+    public void removePack(Pack pack) {
+        // Lógica para deshabilitar o quitar de la lista de selección
+        Collection<String> selected = this.repository.getSelectedIds();
+        if (selected.contains(pack.getId())) {
+            // Aquí iría la lógica para refrescar el repositorio
         }
     }
 
-    public void openPackFolder() {
-        // CORRECCIÓN: En 1.20.1 es openFile o openUri para carpetas
-        Util.getPlatform().openFile(this.packDir.toFile());
+    public PackRepository getRepository() {
+        return this.repository;
     }
 }
