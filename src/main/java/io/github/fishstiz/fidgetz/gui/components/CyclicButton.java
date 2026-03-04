@@ -4,26 +4,40 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import java.util.List;
 
-public class CyclicButton<T, E> extends FidgetzButton<E> {
-    
-    public interface SpriteOption {
-        Component getMessage();
-        ResourceLocation getSprite();
-    }
+public class CyclicButton<T> extends FidgetzButton<Void> {
+    protected final List<T> options;
+    protected int index;
 
-    protected CyclicButton(Builder<T, E> builder) {
+    protected CyclicButton(Builder<T, ?> builder) {
         super(builder);
+        this.options = builder.options;
+        this.index = builder.index;
     }
 
-    // El error principal era que el código buscaba esta interfaz dentro de CyclicButton
-    public interface CyclicValue {
-        Component getMessage();
+    public static <T> Builder<T, ?> builder(List<T> options) {
+        return new Builder<>(options);
     }
 
-    public static class Builder<T, E> extends FidgetzButton.Builder<E> {
-        // Implementación mínima para que AvailablePacksLayout compile
-        public CyclicButton<T, E> build() {
+    public static class Builder<T, B extends Builder<T, B>> extends FidgetzButton.Builder<Void, B> {
+        protected List<T> options;
+        protected int index = 0;
+
+        public Builder(List<T> options) {
+            this.options = options;
+        }
+
+        public B index(int index) {
+            this.index = index;
+            return self();
+        }
+
+        @Override
+        public CyclicButton<T> build() {
             return new CyclicButton<>(this);
         }
+    }
+
+    public interface SpriteOption {
+        ResourceLocation getSprite();
     }
 }
