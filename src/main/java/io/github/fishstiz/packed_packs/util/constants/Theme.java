@@ -3,6 +3,7 @@ package io.github.fishstiz.packed_packs.util.constants;
 import io.github.fishstiz.fidgetz.util.ARGBColor;
 
 public enum Theme implements ARGBColor {
+    RED_500(0xFFEF4444), // Añadido porque PackWidget lo pide
     RED_700(0xFFB00000),
     RED_900(0xFF770000),
     GREEN_500(0xFF22C55E),
@@ -26,5 +27,14 @@ public enum Theme implements ARGBColor {
     @Override
     public int getARGB() {
         return this.argb;
+    }
+
+    /**
+     * Permite cambiar la opacidad del color. 
+     * Necesario para clases como PackListDevMenu que usan .withAlpha(0.75f)
+     */
+    public int withAlpha(float alpha) {
+        int a = Math.round(alpha * 255.0f) << 24;
+        return (this.argb & 0x00FFFFFF) | a;
     }
 }
